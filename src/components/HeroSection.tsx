@@ -149,20 +149,18 @@ const HeroSection = () => {
                 </Button>
               </motion.div>
             </Link>
-            <Link to="/login">
-              <motion.div
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.98 }}
+            <motion.div
+              whileHover={{ scale: 1.02 }}
+            >
+              <Button 
+                variant="outline" 
+                size="lg" 
+                className="text-lg px-8 py-6 rounded-full border-muted/50 text-muted-foreground cursor-not-allowed opacity-60"
+                disabled
               >
-                <Button 
-                  variant="outline" 
-                  size="lg" 
-                  className="text-lg px-8 py-6 rounded-full border-primary/50 hover:border-primary hover:bg-primary/10 transition-all duration-300"
-                >
-                  Kunden Login
-                </Button>
-              </motion.div>
-            </Link>
+                Kundenportal – Coming Soon
+              </Button>
+            </motion.div>
           </motion.div>
 
           {/* Feature Cards */}
@@ -172,25 +170,22 @@ const HeroSection = () => {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.5 }}
           >
-            <Link to="/portal" className="group">
+            <div className="group cursor-not-allowed opacity-60">
               <motion.div 
-                className="relative rounded-2xl p-8 border border-border/50 overflow-hidden"
+                className="relative rounded-2xl p-8 border border-border/30 overflow-hidden"
                 style={{ background: 'linear-gradient(145deg, hsl(222 47% 10% / 0.9) 0%, hsl(222 47% 8% / 0.8) 100%)', backdropFilter: 'blur(20px)' }}
-                whileHover={{ y: -8, scale: 1.02 }}
-                transition={{ duration: 0.3 }}
               >
-                <motion.div className="absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500" style={{ boxShadow: '0 0 60px hsl(185 100% 50% / 0.3), inset 0 0 30px hsl(185 100% 50% / 0.1)' }} />
                 <div className="relative z-10">
-                  <motion.div className="w-14 h-14 rounded-xl flex items-center justify-center mb-5 mx-auto" style={{ background: 'linear-gradient(135deg, hsl(185 100% 50% / 0.2) 0%, hsl(200 100% 60% / 0.1) 100%)' }} whileHover={{ rotate: [0, -10, 10, 0], scale: 1.1 }} transition={{ duration: 0.5 }}>
-                    <Bot className="w-7 h-7 text-primary" />
-                  </motion.div>
-                  <h3 className="font-display font-semibold text-lg text-foreground mb-2">Kundenportal</h3>
-                  <p className="text-sm text-muted-foreground">Dashboard für Ihre Daten</p>
+                  <div className="w-14 h-14 rounded-xl flex items-center justify-center mb-5 mx-auto" style={{ background: 'linear-gradient(135deg, hsl(185 100% 50% / 0.1) 0%, hsl(200 100% 60% / 0.05) 100%)' }}>
+                    <Bot className="w-7 h-7 text-muted-foreground" />
+                  </div>
+                  <h3 className="font-display font-semibold text-lg text-muted-foreground mb-2">Kundenportal</h3>
+                  <p className="text-sm text-muted-foreground/70">Coming Soon</p>
                 </div>
               </motion.div>
-            </Link>
+            </div>
             
-            <Link to="/login" className="group">
+            <Link to="/kontakt" className="group">
               <motion.div 
                 className="relative rounded-2xl p-8 border border-border/50 overflow-hidden"
                 style={{ background: 'linear-gradient(145deg, hsl(222 47% 10% / 0.9) 0%, hsl(222 47% 8% / 0.8) 100%)', backdropFilter: 'blur(20px)' }}
@@ -201,11 +196,11 @@ const HeroSection = () => {
                 <div className="relative z-10">
                   <motion.div className="w-14 h-14 rounded-xl flex items-center justify-center mb-5 mx-auto" style={{ background: 'linear-gradient(135deg, hsl(185 100% 50% / 0.2) 0%, hsl(200 100% 60% / 0.1) 100%)' }} whileHover={{ rotate: [0, -10, 10, 0], scale: 1.1 }} transition={{ duration: 0.5 }}>
                     <svg className="w-7 h-7 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                     </svg>
                   </motion.div>
-                  <h3 className="font-display font-semibold text-lg text-foreground mb-2">Kunden Login</h3>
-                  <p className="text-sm text-muted-foreground">Zugang zum Kundenbereich</p>
+                  <h3 className="font-display font-semibold text-lg text-foreground mb-2">Beratungsgespräch</h3>
+                  <p className="text-sm text-muted-foreground">Kostenloses Erstgespräch</p>
                 </div>
               </motion.div>
             </Link>
