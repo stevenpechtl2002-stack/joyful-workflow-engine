@@ -15,7 +15,7 @@ const services = [
   },
   {
     icon: Workflow,
-    title: "n8n Automatisierungen",
+    title: "Workflow-Automatisierungen",
     description: "Leistungsstarke Workflow-Automatisierungen, die Ihre Geschäftsprozesse optimieren und Zeit sparen.",
     features: ["Lead-Automatisierung", "E-Mail Workflows", "Datenintegration"],
     image: automationFlow,
