@@ -114,7 +114,7 @@ const HeroSection = () => {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.3 }}
           >
-            Individuelle KI-Lösungen, Voice-Agents und Backoffice-Workflows – 
+            Individuelle KI-Lösungen, Voice-Agents und Automatisierungs-Workflows – 
             <span className="text-foreground font-medium"> maßgeschneidert für Ihr Unternehmen.</span>
           </motion.p>
 
@@ -149,7 +149,7 @@ const HeroSection = () => {
                 </Button>
               </motion.div>
             </Link>
-            <Link to="/backoffice">
+            <Link to="/login">
               <motion.div
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.98 }}
@@ -159,7 +159,7 @@ const HeroSection = () => {
                   size="lg" 
                   className="text-lg px-8 py-6 rounded-full border-primary/50 hover:border-primary hover:bg-primary/10 transition-all duration-300"
                 >
-                  Zum Backoffice
+                  Kunden Login
                 </Button>
               </motion.div>
             </Link>
@@ -172,7 +172,7 @@ const HeroSection = () => {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.5 }}
           >
-            <Link to="/backoffice" className="group">
+            <Link to="/portal" className="group">
               <motion.div 
                 className="relative rounded-2xl p-8 border border-border/50 overflow-hidden"
                 style={{ background: 'linear-gradient(145deg, hsl(222 47% 10% / 0.9) 0%, hsl(222 47% 8% / 0.8) 100%)', backdropFilter: 'blur(20px)' }}
@@ -184,7 +184,7 @@ const HeroSection = () => {
                   <motion.div className="w-14 h-14 rounded-xl flex items-center justify-center mb-5 mx-auto" style={{ background: 'linear-gradient(135deg, hsl(185 100% 50% / 0.2) 0%, hsl(200 100% 60% / 0.1) 100%)' }} whileHover={{ rotate: [0, -10, 10, 0], scale: 1.1 }} transition={{ duration: 0.5 }}>
                     <Bot className="w-7 h-7 text-primary" />
                   </motion.div>
-                  <h3 className="font-display font-semibold text-lg text-foreground mb-2">Backoffice</h3>
+                  <h3 className="font-display font-semibold text-lg text-foreground mb-2">Kundenportal</h3>
                   <p className="text-sm text-muted-foreground">Dashboard für Ihre Daten</p>
                 </div>
               </motion.div>
