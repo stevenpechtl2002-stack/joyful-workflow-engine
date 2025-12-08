@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
@@ -53,16 +54,39 @@ const Contact = () => {
     e.preventDefault();
     setIsSubmitting(true);
 
-    // Simulate form submission
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    try {
+      const { data, error } = await supabase.functions.invoke('send-contact-email', {
+        body: {
+          name: formData.name,
+          company: formData.company,
+          phone: formData.phone,
+          email: formData.email,
+          services: formData.services.map(s => 
+            serviceOptions.find(o => o.id === s)?.label || s
+          ),
+          projectDescription: formData.message,
+        },
+      });
 
-    setIsSubmitting(false);
-    setIsSubmitted(true);
+      if (error) {
+        throw error;
+      }
 
-    toast({
-      title: "Anfrage gesendet!",
-      description: "Wir melden uns innerhalb von 24 Stunden bei Ihnen.",
-    });
+      setIsSubmitted(true);
+      toast({
+        title: "Anfrage gesendet!",
+        description: "Wir melden uns innerhalb von 24 Stunden bei Ihnen.",
+      });
+    } catch (error: any) {
+      console.error("Error submitting contact form:", error);
+      toast({
+        title: "Fehler beim Senden",
+        description: "Bitte versuchen Sie es erneut oder kontaktieren Sie uns telefonisch.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   if (isSubmitted) {
