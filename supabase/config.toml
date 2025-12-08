@@ -1,1 +1,10 @@
 project_id = "avfafxojrijfsgsyimwx"
+
+[functions.n8n-appointments]
+verify_jwt = false
+
+[functions.n8n-documents]
+verify_jwt = false
+
+[functions.n8n-webhook]
+verify_jwt = false
