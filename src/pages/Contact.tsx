@@ -23,6 +23,7 @@ import { useToast } from "@/hooks/use-toast";
 
 const serviceOptions = [
   { id: "phone-ai", label: "KI-Telefonassistent", icon: Phone },
+  { id: "workflow", label: "Workflow-Automatisierungen", icon: Workflow },
   { id: "backoffice", label: "Web-Entwicklung", icon: Code2 },
   { id: "custom", label: "Individuelle Anfrage", icon: Sparkles },
 ];
