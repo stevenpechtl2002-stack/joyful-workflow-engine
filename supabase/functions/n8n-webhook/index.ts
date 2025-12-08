@@ -20,6 +20,18 @@ serve(async (req: Request): Promise<Response> => {
   }
 
   try {
+    // Authenticate n8n webhook requests
+    const n8nSecret = Deno.env.get("N8N_WEBHOOK_SECRET");
+    const signature = req.headers.get("x-n8n-signature");
+    
+    if (!n8nSecret || !signature || signature !== n8nSecret) {
+      console.error("Unauthorized request - invalid or missing n8n signature");
+      return new Response(
+        JSON.stringify({ error: "Unauthorized" }),
+        { status: 401, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
