@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import phoneAssistant from "@/assets/phone-assistant.png";
 import automationFlow from "@/assets/automation-flow.png";
 import backofficeVisual from "@/assets/backoffice-visual.png";
+import webAssistant from "@/assets/web-assistant.png";
 
 const services = [
   {
@@ -26,7 +27,7 @@ const services = [
     title: "Web KI-Assistenten",
     description: "Chatbots und virtuelle Assistenten für Ihre Website, die Kunden beraten und Support bieten.",
     features: ["24/7 Verfügbarkeit", "Personalisiert", "Lernfähig"],
-    image: phoneAssistant,
+    image: webAssistant,
     gradient: "from-purple-500/20 to-pink-500/20"
   },
   {
