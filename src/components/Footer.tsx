@@ -1,9 +1,7 @@
 import { Link } from "react-router-dom";
 import { Bot, Mail, Phone, MapPin, Linkedin, Twitter } from "lucide-react";
-
 const Footer = () => {
-  return (
-    <footer className="bg-card border-t border-border/50">
+  return <footer className="bg-card border-t border-border/50">
       <div className="container mx-auto px-4 py-12">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           {/* Logo & Description */}
@@ -13,7 +11,7 @@ const Footer = () => {
                 <Bot className="w-6 h-6 text-primary-foreground" />
               </div>
               <span className="font-display font-bold text-xl text-foreground">
-                AI<span className="text-gradient">Assist</span>
+                ​NextGen<span className="text-gradient">SmartSolution</span>
               </span>
             </Link>
             <p className="text-muted-foreground max-w-md">
@@ -94,8 +92,6 @@ const Footer = () => {
           </p>
         </div>
       </div>
-    </footer>
-  );
+    </footer>;
 };
-
 export default Footer;
