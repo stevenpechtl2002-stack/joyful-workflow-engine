@@ -52,8 +52,7 @@ const handler = async (req: Request): Promise<Response> => {
       },
       body: JSON.stringify({
         from: "NextGen Smart Solutions <onboarding@resend.dev>",
-        to: ["steven.pechtl@nextgensmartsolution.de"],
-        cc: ["steven.pechtl2002@gmail.com"],
+        to: ["stevenpechtl2002@gmail.com"],
         subject: `Neue Kontaktanfrage von ${formData.name}`,
         html: `
           <h1>Neue Kontaktanfrage</h1>
