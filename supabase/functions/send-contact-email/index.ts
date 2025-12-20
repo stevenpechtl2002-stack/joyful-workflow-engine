@@ -51,7 +51,7 @@ const handler = async (req: Request): Promise<Response> => {
         Authorization: `Bearer ${RESEND_API_KEY}`,
       },
       body: JSON.stringify({
-        from: "NextGen Smart Solutions <kontakt@nextgensmartsolution.de>",
+        from: "NextGen Smart Solutions <steven.pechtl@nextgensmartsolution.de>",
         to: ["steven.pechtl@nextgensmartsolution.de"],
         subject: `Neue Kontaktanfrage von ${formData.name}`,
         html: `
@@ -87,7 +87,7 @@ const handler = async (req: Request): Promise<Response> => {
         Authorization: `Bearer ${RESEND_API_KEY}`,
       },
       body: JSON.stringify({
-        from: "NextGen Smart Solutions <kontakt@nextgensmartsolution.de>",
+        from: "NextGen Smart Solutions <steven.pechtl@nextgensmartsolution.de>",
         to: [formData.email],
         subject: "Vielen Dank für Ihre Anfrage!",
         html: `
