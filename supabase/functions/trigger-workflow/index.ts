@@ -114,8 +114,8 @@ serve(async (req) => {
       templateId: template_id 
     });
 
-    // Trigger the n8n webhook for voice agent creation
-    const n8nWebhookUrl = "https://stevenpechtl.app.n8n.cloud/webhook/create-voice-agent";
+    // Trigger the n8n webhook for voice agent creation (TEST URL)
+    const n8nWebhookUrl = "https://stevenpechtl.app.n8n.cloud/webhook-test/create-voice-agent";
     
     // Prepare simple payload with customer name
     const customerName = profile?.full_name || profile?.company_name || user.email?.split('@')[0] || 'Kunde';
