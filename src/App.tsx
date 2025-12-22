@@ -22,6 +22,7 @@ import Notifications from "./pages/portal/Notifications";
 import Profile from "./pages/portal/Profile";
 import Subscriptions from "./pages/portal/Subscriptions";
 import Workflows from "./pages/portal/Workflows";
+import WorkflowSetup from "./pages/portal/WorkflowSetup";
 
 const queryClient = new QueryClient();
 
@@ -49,6 +50,7 @@ const App = () => (
               <Route path="notifications" element={<Notifications />} />
               <Route path="subscriptions" element={<Subscriptions />} />
               <Route path="workflows" element={<Workflows />} />
+              <Route path="workflow-setup" element={<WorkflowSetup />} />
               <Route path="profile" element={<Profile />} />
             </Route>
             

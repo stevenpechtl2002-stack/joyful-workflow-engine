@@ -56,6 +56,62 @@ export type Database = {
         }
         Relationships: []
       }
+      customer_workflows: {
+        Row: {
+          activated_at: string | null
+          admin_notes: string | null
+          approved_at: string | null
+          approved_by: string | null
+          configuration: Json | null
+          created_at: string
+          credentials: Json | null
+          id: string
+          n8n_workflow_id: string | null
+          status: string
+          template_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          activated_at?: string | null
+          admin_notes?: string | null
+          approved_at?: string | null
+          approved_by?: string | null
+          configuration?: Json | null
+          created_at?: string
+          credentials?: Json | null
+          id?: string
+          n8n_workflow_id?: string | null
+          status?: string
+          template_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          activated_at?: string | null
+          admin_notes?: string | null
+          approved_at?: string | null
+          approved_by?: string | null
+          configuration?: Json | null
+          created_at?: string
+          credentials?: Json | null
+          id?: string
+          n8n_workflow_id?: string | null
+          status?: string
+          template_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_workflows_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "workflow_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       documents: {
         Row: {
           created_at: string
@@ -227,6 +283,48 @@ export type Database = {
           user_id?: string
           workflow_id?: string
           workflow_name?: string
+        }
+        Relationships: []
+      }
+      workflow_templates: {
+        Row: {
+          category: string | null
+          configuration_schema: Json | null
+          created_at: string
+          description: string | null
+          icon: string | null
+          id: string
+          is_active: boolean | null
+          n8n_workflow_id: string | null
+          name: string
+          required_credentials: Json
+          updated_at: string
+        }
+        Insert: {
+          category?: string | null
+          configuration_schema?: Json | null
+          created_at?: string
+          description?: string | null
+          icon?: string | null
+          id?: string
+          is_active?: boolean | null
+          n8n_workflow_id?: string | null
+          name: string
+          required_credentials?: Json
+          updated_at?: string
+        }
+        Update: {
+          category?: string | null
+          configuration_schema?: Json | null
+          created_at?: string
+          description?: string | null
+          icon?: string | null
+          id?: string
+          is_active?: boolean | null
+          n8n_workflow_id?: string | null
+          name?: string
+          required_credentials?: Json
+          updated_at?: string
         }
         Relationships: []
       }
