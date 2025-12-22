@@ -89,11 +89,12 @@ const Workflows = () => {
     if (!session?.user?.id) return;
     
     try {
-      // Fetch active templates
+      // Fetch only Telefon Assistent template
       const { data: templatesData, error: templatesError } = await supabase
         .from('workflow_templates')
         .select('*')
-        .eq('is_active', true);
+        .eq('is_active', true)
+        .eq('name', 'Telefon Assistent');
       
       if (templatesError) throw templatesError;
       setTemplates(templatesData || []);
