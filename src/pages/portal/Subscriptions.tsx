@@ -36,8 +36,8 @@ interface SubscriptionStatus {
 
 const features = [
   'KI-Telefonassistent',
-  'Unbegrenzte Automatisierungen',
-  'n8n-Workflow Integration',
+  'Individuelle Automatisierungen',
+  'Workflow Integration',
   'Premium Dashboard',
   'Dokumentenverwaltung',
   'Priority Support',
