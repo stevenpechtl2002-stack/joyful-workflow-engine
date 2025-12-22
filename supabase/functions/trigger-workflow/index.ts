@@ -36,16 +36,25 @@ serve(async (req) => {
     const user = userData.user;
     if (!user) throw new Error("User not authenticated");
     
-    logStep("User authenticated", { userId: user.id });
+    logStep("User authenticated", { userId: user.id, email: user.email });
 
     // Get request body
-    const { workflow_id, workflow_name, input_data = {} } = await req.json();
+    const body = await req.json();
+    const { 
+      workflow_id, 
+      workflow_name, 
+      input_data = {},
+      action = 'trigger', // 'trigger' or 'setup_workflow'
+      template_id,
+      customer_workflow_id,
+      credentials
+    } = body;
     
     if (!workflow_id || !workflow_name) {
       throw new Error("workflow_id and workflow_name are required");
     }
 
-    logStep("Workflow request", { workflow_id, workflow_name });
+    logStep("Workflow request", { workflow_id, workflow_name, action });
 
     // Create workflow run record
     const { data: workflowRun, error: insertError } = await supabaseClient
@@ -55,8 +64,13 @@ serve(async (req) => {
         workflow_id,
         workflow_name,
         status: 'running',
-        trigger_type: 'manual',
-        input_data,
+        trigger_type: action === 'setup_workflow' ? 'setup' : 'manual',
+        input_data: {
+          ...input_data,
+          action,
+          template_id,
+          customer_workflow_id
+        },
         started_at: new Date().toISOString()
       })
       .select()
@@ -65,6 +79,40 @@ serve(async (req) => {
     if (insertError) throw insertError;
     
     logStep("Workflow run created", { runId: workflowRun.id });
+
+    // Get user profile for additional context
+    const { data: profile } = await supabaseClient
+      .from('profiles')
+      .select('*')
+      .eq('id', user.id)
+      .single();
+
+    // Prepare n8n payload
+    const n8nPayload = {
+      run_id: workflowRun.id,
+      user_id: user.id,
+      user_email: user.email,
+      user_name: profile?.full_name || user.email,
+      company_name: profile?.company_name || null,
+      workflow_id,
+      workflow_name,
+      action,
+      input_data,
+      // For workflow setup
+      template_id: template_id || null,
+      customer_workflow_id: customer_workflow_id || null,
+      credentials: credentials || null,
+      // Callback URL for n8n to update status
+      callback_url: `${Deno.env.get("SUPABASE_URL")}/functions/v1/n8n-webhook`,
+      supabase_url: Deno.env.get("SUPABASE_URL"),
+      timestamp: new Date().toISOString()
+    };
+
+    logStep("Prepared n8n payload", { 
+      action, 
+      hasCredentials: !!credentials,
+      templateId: template_id 
+    });
 
     // Trigger the n8n webhook
     const n8nWebhookUrl = Deno.env.get("N8N_WEBHOOK_URL");
@@ -75,37 +123,50 @@ serve(async (req) => {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'X-Webhook-Secret': Deno.env.get("N8N_WEBHOOK_SECRET") || ''
+            'X-Webhook-Secret': Deno.env.get("N8N_WEBHOOK_SECRET") || '',
+            'X-Action': action
           },
-          body: JSON.stringify({
-            run_id: workflowRun.id,
-            user_id: user.id,
-            user_email: user.email,
-            workflow_id,
-            workflow_name,
-            input_data,
-            callback_url: `${Deno.env.get("SUPABASE_URL")}/functions/v1/n8n-webhook`
-          })
+          body: JSON.stringify(n8nPayload)
         });
 
-        logStep("n8n webhook triggered", { 
+        const responseText = await n8nResponse.text();
+        
+        logStep("n8n webhook response", { 
           status: n8nResponse.status,
-          ok: n8nResponse.ok 
+          ok: n8nResponse.ok,
+          response: responseText.substring(0, 200)
         });
+
+        if (!n8nResponse.ok) {
+          logStep("n8n webhook returned error", { status: n8nResponse.status });
+        }
       } catch (webhookError) {
-        logStep("n8n webhook failed (continuing)", { error: String(webhookError) });
+        logStep("n8n webhook failed", { error: String(webhookError) });
+        
+        // Update workflow run with error
+        await supabaseClient
+          .from('workflow_runs')
+          .update({
+            status: 'failed',
+            error_message: `n8n connection failed: ${String(webhookError)}`,
+            completed_at: new Date().toISOString()
+          })
+          .eq('id', workflowRun.id);
       }
     } else {
       logStep("No N8N_WEBHOOK_URL configured, simulating completion");
       
-      // Simulate workflow completion after a short delay
+      // Simulate workflow completion for demo/testing
       setTimeout(async () => {
         await supabaseClient
           .from('workflow_runs')
           .update({
             status: 'completed',
             completed_at: new Date().toISOString(),
-            output_data: { message: 'Workflow completed successfully' }
+            output_data: { 
+              message: 'Workflow setup completed (demo mode)',
+              note: 'Configure N8N_WEBHOOK_URL for production'
+            }
           })
           .eq('id', workflowRun.id);
       }, 3000);
@@ -113,7 +174,10 @@ serve(async (req) => {
 
     return new Response(JSON.stringify({ 
       success: true, 
-      run_id: workflowRun.id 
+      run_id: workflowRun.id,
+      message: action === 'setup_workflow' 
+        ? 'Workflow-Setup wurde an n8n gesendet' 
+        : 'Workflow wurde gestartet'
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,
