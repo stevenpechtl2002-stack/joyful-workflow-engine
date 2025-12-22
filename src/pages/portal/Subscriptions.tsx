@@ -363,6 +363,11 @@ const Subscriptions = () => {
 
                 <p className="text-xs text-muted-foreground">
                   Sichere Zahlung über Stripe. Mindestlaufzeit 12 Monate.
+                  <br />
+                  Kein Widerrufsrecht (individuelles Produkt).{' '}
+                  <a href="/agb" className="text-primary hover:underline">
+                    AGB lesen
+                  </a>
                 </p>
               </CardContent>
             </Card>
