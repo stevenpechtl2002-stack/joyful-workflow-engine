@@ -86,7 +86,7 @@ const BenefitsSection = () => {
               WebkitBackgroundClip: 'text',
               WebkitTextFillColor: 'transparent'
             }}>
-                NextGenAi
+                NextGenAI
               </span>
               ?
             </h2>
