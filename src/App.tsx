@@ -9,6 +9,7 @@ import Login from "./pages/Login";
 import Contact from "./pages/Contact";
 import Impressum from "./pages/Impressum";
 import Datenschutz from "./pages/Datenschutz";
+import AGB from "./pages/AGB";
 import NotFound from "./pages/NotFound";
 
 // Portal Pages
@@ -36,6 +37,7 @@ const App = () => (
             <Route path="/kontakt" element={<Contact />} />
             <Route path="/impressum" element={<Impressum />} />
             <Route path="/datenschutz" element={<Datenschutz />} />
+            <Route path="/agb" element={<AGB />} />
             
             {/* Portal Routes */}
             <Route path="/portal/auth" element={<PortalAuth />} />
