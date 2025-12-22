@@ -1,71 +1,146 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
+import { useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 import { 
   CreditCard, 
   Calendar, 
   FileText, 
-  Download,
   CheckCircle,
   Clock,
   Package,
   Euro,
-  ExternalLink
+  ExternalLink,
+  Loader2,
+  Sparkles,
+  ArrowRight,
+  RefreshCw,
+  Settings
 } from 'lucide-react';
 
-// Mock data - wird später durch Stripe ersetzt
-const mockSubscription = {
-  id: 'sub_1',
-  name: 'Professional Plan',
-  status: 'active' as const,
-  price: 99.00,
-  currency: 'EUR',
-  interval: 'month' as const,
-  currentPeriodStart: new Date('2024-12-01'),
-  currentPeriodEnd: new Date('2025-01-01'),
-  features: [
-    'KI-Telefonassistent',
-    'Unbegrenzte Anrufe',
-    'Workflow-Automatisierungen',
-    'Priority Support',
-    '24/7 Verfügbarkeit'
-  ]
-};
+const SUBSCRIPTION_PRICE = 499.99;
+const PRODUCT_ID = "prod_TeG5dVBHN5lNA5";
 
-const mockInvoices = [
-  {
-    id: 'inv_001',
-    date: new Date('2024-12-01'),
-    amount: 99.00,
-    status: 'paid' as const,
-    description: 'Professional Plan - Dezember 2024'
-  },
-  {
-    id: 'inv_002',
-    date: new Date('2024-11-01'),
-    amount: 99.00,
-    status: 'paid' as const,
-    description: 'Professional Plan - November 2024'
-  },
-  {
-    id: 'inv_003',
-    date: new Date('2024-10-01'),
-    amount: 99.00,
-    status: 'paid' as const,
-    description: 'Professional Plan - Oktober 2024'
-  },
+interface SubscriptionStatus {
+  subscribed: boolean;
+  product_id: string | null;
+  subscription_end: string | null;
+}
+
+const features = [
+  'KI-Telefonassistent',
+  'Unbegrenzte Automatisierungen',
+  'n8n-Workflow Integration',
+  'Premium Dashboard',
+  'Dokumentenverwaltung',
+  'Priority Support',
+  '24/7 Verfügbarkeit'
 ];
 
 const Subscriptions = () => {
-  const { profile } = useAuth();
-  const [activeTab, setActiveTab] = useState<'overview' | 'invoices'>('overview');
+  const { profile, session } = useAuth();
+  const { toast } = useToast();
+  const [searchParams] = useSearchParams();
+  
+  const [subscriptionStatus, setSubscriptionStatus] = useState<SubscriptionStatus | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isCheckoutLoading, setIsCheckoutLoading] = useState(false);
+  const [isPortalLoading, setIsPortalLoading] = useState(false);
 
-  const formatDate = (date: Date) => {
-    return date.toLocaleDateString('de-DE', {
+  // Check for success/cancel query params
+  useEffect(() => {
+    if (searchParams.get('success') === 'true') {
+      toast({
+        title: 'Zahlung erfolgreich!',
+        description: 'Ihr Abonnement wurde aktiviert.',
+      });
+      checkSubscription();
+    } else if (searchParams.get('canceled') === 'true') {
+      toast({
+        title: 'Zahlung abgebrochen',
+        description: 'Die Zahlung wurde nicht abgeschlossen.',
+        variant: 'destructive',
+      });
+    }
+  }, [searchParams]);
+
+  const checkSubscription = async () => {
+    if (!session) return;
+    
+    setIsLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('check-subscription');
+      
+      if (error) throw error;
+      setSubscriptionStatus(data);
+    } catch (error) {
+      console.error('Error checking subscription:', error);
+      setSubscriptionStatus({ subscribed: false, product_id: null, subscription_end: null });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    checkSubscription();
+    
+    // Auto-refresh every minute
+    const interval = setInterval(checkSubscription, 60000);
+    return () => clearInterval(interval);
+  }, [session]);
+
+  const handleCheckout = async () => {
+    setIsCheckoutLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('create-checkout');
+      
+      if (error) throw error;
+      
+      if (data?.url) {
+        window.open(data.url, '_blank');
+      }
+    } catch (error: any) {
+      console.error('Checkout error:', error);
+      toast({
+        title: 'Fehler',
+        description: 'Checkout konnte nicht gestartet werden.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsCheckoutLoading(false);
+    }
+  };
+
+  const handleManageSubscription = async () => {
+    setIsPortalLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('customer-portal');
+      
+      if (error) throw error;
+      
+      if (data?.url) {
+        window.open(data.url, '_blank');
+      }
+    } catch (error: any) {
+      console.error('Portal error:', error);
+      toast({
+        title: 'Fehler',
+        description: 'Kundenportal konnte nicht geöffnet werden.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsPortalLoading(false);
+    }
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('de-DE', {
       day: '2-digit',
       month: '2-digit',
       year: 'numeric'
@@ -79,17 +154,17 @@ const Subscriptions = () => {
     }).format(amount);
   };
 
-  const getStatusBadge = (status: 'active' | 'canceled' | 'past_due' | 'paid' | 'open') => {
-    const variants = {
-      active: { label: 'Aktiv', className: 'bg-green-500/20 text-green-400 border-green-500/30' },
-      paid: { label: 'Bezahlt', className: 'bg-green-500/20 text-green-400 border-green-500/30' },
-      canceled: { label: 'Gekündigt', className: 'bg-red-500/20 text-red-400 border-red-500/30' },
-      past_due: { label: 'Überfällig', className: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30' },
-      open: { label: 'Offen', className: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30' }
-    };
-    const variant = variants[status];
-    return <Badge className={variant.className}>{variant.label}</Badge>;
-  };
+  const isSubscribed = subscriptionStatus?.subscribed && subscriptionStatus?.product_id === PRODUCT_ID;
+
+  if (isLoading) {
+    return (
+      <div className="p-6 lg:p-8 max-w-5xl mx-auto">
+        <div className="flex items-center justify-center min-h-[400px]">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 lg:p-8 max-w-5xl mx-auto">
@@ -97,86 +172,67 @@ const Subscriptions = () => {
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="mb-8"
+        className="mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4"
       >
-        <h1 className="text-3xl font-display font-bold text-foreground mb-2">
-          Abonnement & Abrechnung
-        </h1>
-        <p className="text-muted-foreground">
-          Verwalten Sie Ihr Abonnement und sehen Sie Ihre Rechnungen ein
-        </p>
+        <div>
+          <h1 className="text-3xl font-display font-bold text-foreground mb-2">
+            Abonnement & Abrechnung
+          </h1>
+          <p className="text-muted-foreground">
+            Verwalten Sie Ihr Premium-Abonnement
+          </p>
+        </div>
+        <Button variant="outline" size="sm" onClick={checkSubscription} disabled={isLoading}>
+          <RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+          Aktualisieren
+        </Button>
       </motion.div>
 
-      {/* Tab Navigation */}
-      <div className="flex gap-2 mb-6">
-        <Button
-          variant={activeTab === 'overview' ? 'default' : 'outline'}
-          onClick={() => setActiveTab('overview')}
-          className="gap-2"
-        >
-          <Package className="w-4 h-4" />
-          Übersicht
-        </Button>
-        <Button
-          variant={activeTab === 'invoices' ? 'default' : 'outline'}
-          onClick={() => setActiveTab('invoices')}
-          className="gap-2"
-        >
-          <FileText className="w-4 h-4" />
-          Rechnungen
-        </Button>
-      </div>
-
-      {activeTab === 'overview' ? (
+      {isSubscribed ? (
+        /* Active Subscription View */
         <div className="grid gap-6">
-          {/* Current Subscription Card */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
           >
-            <Card className="glass border-border/50 overflow-hidden">
-              <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-primary/10" />
+            <Card className="glass border-primary/30 overflow-hidden relative">
+              <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-accent/10" />
               <CardHeader className="relative">
                 <div className="flex items-center justify-between">
                   <div>
                     <CardTitle className="text-2xl font-display flex items-center gap-3">
                       <Package className="w-6 h-6 text-primary" />
-                      {mockSubscription.name}
+                      NextGenAI Premium
                     </CardTitle>
                     <CardDescription className="mt-1">
-                      Ihr aktuelles Abonnement
+                      Ihr aktives Abonnement
                     </CardDescription>
                   </div>
-                  {getStatusBadge(mockSubscription.status)}
+                  <Badge className="bg-green-500/20 text-green-400 border-green-500/30">
+                    Aktiv
+                  </Badge>
                 </div>
               </CardHeader>
               <CardContent className="relative space-y-6">
                 {/* Price Display */}
                 <div className="flex items-baseline gap-2">
                   <span className="text-4xl font-display font-bold text-foreground">
-                    {formatCurrency(mockSubscription.price)}
+                    {formatCurrency(SUBSCRIPTION_PRICE)}
                   </span>
                   <span className="text-muted-foreground">/ Monat</span>
                 </div>
 
-                {/* Billing Period */}
-                <div className="flex flex-wrap gap-6 text-sm">
-                  <div className="flex items-center gap-2 text-muted-foreground">
-                    <Calendar className="w-4 h-4" />
-                    <span>Aktueller Zeitraum:</span>
-                    <span className="text-foreground font-medium">
-                      {formatDate(mockSubscription.currentPeriodStart)} - {formatDate(mockSubscription.currentPeriodEnd)}
-                    </span>
-                  </div>
+                {/* Next Billing Date */}
+                {subscriptionStatus?.subscription_end && (
                   <div className="flex items-center gap-2 text-muted-foreground">
                     <Clock className="w-4 h-4" />
                     <span>Nächste Abrechnung:</span>
                     <span className="text-foreground font-medium">
-                      {formatDate(mockSubscription.currentPeriodEnd)}
+                      {formatDate(subscriptionStatus.subscription_end)}
                     </span>
                   </div>
-                </div>
+                )}
 
                 <Separator />
 
@@ -184,7 +240,7 @@ const Subscriptions = () => {
                 <div>
                   <h4 className="font-medium text-foreground mb-3">Enthaltene Leistungen</h4>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                    {mockSubscription.features.map((feature, index) => (
+                    {features.map((feature, index) => (
                       <div key={index} className="flex items-center gap-2 text-sm text-muted-foreground">
                         <CheckCircle className="w-4 h-4 text-green-500" />
                         <span>{feature}</span>
@@ -195,112 +251,103 @@ const Subscriptions = () => {
 
                 <Separator />
 
-                {/* Actions */}
-                <div className="flex flex-wrap gap-3">
-                  <Button variant="outline" className="gap-2" disabled>
-                    <CreditCard className="w-4 h-4" />
-                    Zahlungsmethode ändern
-                  </Button>
-                  <Button variant="ghost" className="gap-2 text-muted-foreground" disabled>
-                    Abo kündigen
-                  </Button>
-                </div>
-
-                <p className="text-xs text-muted-foreground">
-                  * Stripe-Integration wird in Kürze aktiviert. Kontaktieren Sie uns für Änderungen.
-                </p>
-              </CardContent>
-            </Card>
-          </motion.div>
-
-          {/* Payment Method Card */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-          >
-            <Card className="glass border-border/50">
-              <CardHeader>
-                <CardTitle className="text-xl font-display flex items-center gap-2">
-                  <CreditCard className="w-5 h-5 text-primary" />
-                  Zahlungsmethode
-                </CardTitle>
-                <CardDescription>
-                  Ihre hinterlegte Zahlungsmethode
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center gap-4 p-4 bg-secondary/30 rounded-lg border border-border/50">
-                  <div className="w-12 h-8 bg-gradient-to-r from-blue-600 to-blue-400 rounded flex items-center justify-center text-white text-xs font-bold">
-                    VISA
-                  </div>
-                  <div>
-                    <p className="font-medium text-foreground">•••• •••• •••• 4242</p>
-                    <p className="text-sm text-muted-foreground">Gültig bis 12/26</p>
-                  </div>
-                  <Badge variant="outline" className="ml-auto">Standard</Badge>
-                </div>
+                {/* Manage Button */}
+                <Button 
+                  variant="outline" 
+                  className="gap-2" 
+                  onClick={handleManageSubscription}
+                  disabled={isPortalLoading}
+                >
+                  {isPortalLoading ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Settings className="w-4 h-4" />
+                  )}
+                  Abonnement verwalten
+                </Button>
               </CardContent>
             </Card>
           </motion.div>
         </div>
       ) : (
-        /* Invoices Tab */
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-        >
-          <Card className="glass border-border/50">
-            <CardHeader>
-              <CardTitle className="text-xl font-display flex items-center gap-2">
-                <FileText className="w-5 h-5 text-primary" />
-                Rechnungshistorie
-              </CardTitle>
-              <CardDescription>
-                Alle Ihre bisherigen Rechnungen
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {mockInvoices.map((invoice, index) => (
-                  <motion.div
-                    key={invoice.id}
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: index * 0.1 }}
-                    className="flex items-center justify-between p-4 bg-secondary/30 rounded-lg border border-border/50 hover:bg-secondary/50 transition-colors"
-                  >
-                    <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                        <Euro className="w-5 h-5 text-primary" />
-                      </div>
-                      <div>
-                        <p className="font-medium text-foreground">{invoice.description}</p>
-                        <p className="text-sm text-muted-foreground">{formatDate(invoice.date)}</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-4">
-                      <div className="text-right">
-                        <p className="font-semibold text-foreground">{formatCurrency(invoice.amount)}</p>
-                        {getStatusBadge(invoice.status)}
-                      </div>
-                      <Button variant="ghost" size="icon" disabled title="Download (bald verfügbar)">
-                        <Download className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  </motion.div>
-                ))}
+        /* No Subscription - Show Pricing */
+        <div className="grid gap-6">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+          >
+            <Card className="glass border-primary/30 overflow-hidden relative">
+              <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-accent/10" />
+              <div className="absolute top-4 right-4">
+                <Badge className="bg-primary/20 text-primary border-primary/30">
+                  <Sparkles className="w-3 h-3 mr-1" />
+                  Premium
+                </Badge>
               </div>
-
-              {mockInvoices.length === 0 && (
-                <div className="text-center py-12 text-muted-foreground">
-                  <FileText className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                  <p>Noch keine Rechnungen vorhanden</p>
+              <CardHeader className="relative text-center pt-12">
+                <CardTitle className="text-3xl font-display">
+                  NextGenAI Premium
+                </CardTitle>
+                <CardDescription className="text-lg mt-2">
+                  Vollzugriff auf alle Features
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="relative space-y-8 text-center">
+                {/* Price Display */}
+                <div className="flex items-baseline justify-center gap-2">
+                  <span className="text-5xl font-display font-bold text-foreground">
+                    {formatCurrency(SUBSCRIPTION_PRICE)}
+                  </span>
+                  <span className="text-muted-foreground text-lg">/ Monat</span>
                 </div>
-              )}
-            </CardContent>
-          </Card>
-        </motion.div>
+
+                {/* Features */}
+                <div className="max-w-md mx-auto text-left">
+                  <div className="grid gap-3">
+                    {features.map((feature, index) => (
+                      <motion.div 
+                        key={index} 
+                        initial={{ opacity: 0, x: -10 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: 0.2 + index * 0.05 }}
+                        className="flex items-center gap-3 text-muted-foreground"
+                      >
+                        <div className="w-5 h-5 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
+                          <CheckCircle className="w-3 h-3 text-primary" />
+                        </div>
+                        <span>{feature}</span>
+                      </motion.div>
+                    ))}
+                  </div>
+                </div>
+
+                <Separator />
+
+                {/* CTA Button */}
+                <Button 
+                  variant="hero" 
+                  size="lg" 
+                  className="w-full max-w-sm mx-auto"
+                  onClick={handleCheckout}
+                  disabled={isCheckoutLoading}
+                >
+                  {isCheckoutLoading ? (
+                    <Loader2 className="w-5 h-5 animate-spin mr-2" />
+                  ) : (
+                    <CreditCard className="w-5 h-5 mr-2" />
+                  )}
+                  Jetzt abonnieren
+                  <ArrowRight className="w-5 h-5 ml-2" />
+                </Button>
+
+                <p className="text-xs text-muted-foreground">
+                  Sichere Zahlung über Stripe. Jederzeit kündbar.
+                </p>
+              </CardContent>
+            </Card>
+          </motion.div>
+        </div>
       )}
 
       {/* Contact Card */}
