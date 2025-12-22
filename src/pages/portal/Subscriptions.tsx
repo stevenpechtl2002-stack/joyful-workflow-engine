@@ -304,10 +304,14 @@ const Subscriptions = () => {
                     </span>
                     <span className="text-muted-foreground text-lg">/ Monat</span>
                   </div>
-                  <div className="flex items-center justify-center gap-2 text-muted-foreground">
-                    <span className="text-sm">+</span>
-                    <span className="text-lg font-semibold text-foreground">{formatCurrency(SETUP_FEE)}</span>
-                    <span className="text-sm">einmalige Setup-Gebühr</span>
+                  <div className="text-muted-foreground space-y-1">
+                    <div className="flex items-center justify-center gap-2">
+                      <span className="text-lg font-semibold text-foreground">{formatCurrency(SETUP_FEE)}</span>
+                      <span className="text-sm">einmalig sofort fällig</span>
+                    </div>
+                    <div className="text-sm">
+                      Abo startet automatisch nach 30 Tagen
+                    </div>
                   </div>
                   <div className="text-sm text-muted-foreground">
                     Mindestlaufzeit: {MIN_CONTRACT_MONTHS} Monate

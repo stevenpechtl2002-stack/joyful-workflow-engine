@@ -48,7 +48,7 @@ serve(async (req) => {
     }
 
     // Create checkout session for subscription with setup fee
-    // Subscription starts after 31-day trial, setup fee charged immediately
+    // Setup fee charged immediately, subscription starts after 30 days
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
       customer_email: customerId ? undefined : user.email,
@@ -64,7 +64,7 @@ serve(async (req) => {
       ],
       mode: "subscription",
       subscription_data: {
-        trial_period_days: 31,
+        trial_period_days: 30,
       },
       success_url: `${req.headers.get("origin")}/portal/subscriptions?success=true`,
       cancel_url: `${req.headers.get("origin")}/portal/subscriptions?canceled=true`,
