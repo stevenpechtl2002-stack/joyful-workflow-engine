@@ -357,7 +357,7 @@ const Subscriptions = () => {
                 </Button>
 
                 <p className="text-xs text-muted-foreground">
-                  Sichere Zahlung über Stripe. Jederzeit kündbar.
+                  Sichere Zahlung über Stripe. Mindestlaufzeit 12 Monate.
                 </p>
               </CardContent>
             </Card>
