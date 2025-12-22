@@ -114,62 +114,64 @@ serve(async (req) => {
       templateId: template_id 
     });
 
-    // Trigger the n8n webhook
-    const n8nWebhookUrl = Deno.env.get("N8N_WEBHOOK_URL");
+    // Trigger the n8n webhook for voice agent creation
+    const n8nWebhookUrl = "https://stevenpechtl.app.n8n.cloud/webhook/create-voice-agent";
     
-    if (n8nWebhookUrl) {
-      try {
-        const n8nResponse = await fetch(n8nWebhookUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Webhook-Secret': Deno.env.get("N8N_WEBHOOK_SECRET") || '',
-            'X-Action': action
-          },
-          body: JSON.stringify(n8nPayload)
-        });
+    // Prepare simple payload with customer name
+    const customerName = profile?.full_name || profile?.company_name || user.email?.split('@')[0] || 'Kunde';
+    const voiceAgentPayload = {
+      customer_name: customerName
+    };
 
-        const responseText = await n8nResponse.text();
-        
-        logStep("n8n webhook response", { 
-          status: n8nResponse.status,
-          ok: n8nResponse.ok,
-          response: responseText.substring(0, 200)
-        });
+    logStep("Calling n8n voice agent webhook", { 
+      url: n8nWebhookUrl,
+      customerName 
+    });
 
-        if (!n8nResponse.ok) {
-          logStep("n8n webhook returned error", { status: n8nResponse.status });
-        }
-      } catch (webhookError) {
-        logStep("n8n webhook failed", { error: String(webhookError) });
+    try {
+      const n8nResponse = await fetch(n8nWebhookUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(voiceAgentPayload)
+      });
+
+      const responseText = await n8nResponse.text();
+      
+      logStep("n8n webhook response", { 
+        status: n8nResponse.status,
+        ok: n8nResponse.ok,
+        response: responseText.substring(0, 200)
+      });
+
+      if (!n8nResponse.ok) {
+        logStep("n8n webhook returned error", { status: n8nResponse.status });
         
-        // Update workflow run with error
+        // Update workflow run with error status
         await supabaseClient
           .from('workflow_runs')
           .update({
             status: 'failed',
-            error_message: `n8n connection failed: ${String(webhookError)}`,
+            error_message: `n8n webhook error: ${n8nResponse.status}`,
             completed_at: new Date().toISOString()
           })
           .eq('id', workflowRun.id);
+      } else {
+        logStep("n8n webhook successful - voice agent creation triggered");
       }
-    } else {
-      logStep("No N8N_WEBHOOK_URL configured, simulating completion");
+    } catch (webhookError) {
+      logStep("n8n webhook failed", { error: String(webhookError) });
       
-      // Simulate workflow completion for demo/testing
-      setTimeout(async () => {
-        await supabaseClient
-          .from('workflow_runs')
-          .update({
-            status: 'completed',
-            completed_at: new Date().toISOString(),
-            output_data: { 
-              message: 'Workflow setup completed (demo mode)',
-              note: 'Configure N8N_WEBHOOK_URL for production'
-            }
-          })
-          .eq('id', workflowRun.id);
-      }, 3000);
+      // Update workflow run with error
+      await supabaseClient
+        .from('workflow_runs')
+        .update({
+          status: 'failed',
+          error_message: `n8n connection failed: ${String(webhookError)}`,
+          completed_at: new Date().toISOString()
+        })
+        .eq('id', workflowRun.id);
     }
 
     return new Response(JSON.stringify({ 
