@@ -11,7 +11,7 @@ const Footer = () => {
                 <Bot className="w-6 h-6 text-primary-foreground" />
               </div>
               <span className="font-display font-bold text-xl text-foreground">
-                ​NextGen<span className="text-gradient">SmartSolution</span>
+                NextGen<span className="text-gradient">Ai</span>
               </span>
             </Link>
             <p className="text-muted-foreground max-w-md">
@@ -81,7 +81,7 @@ const Footer = () => {
           </div>
 
           <p className="text-sm text-muted-foreground">
-            © 2024 NextGen Smart Solutions. Alle Rechte vorbehalten.
+            © 2024 NextGenAi. Alle Rechte vorbehalten.
           </p>
         </div>
       </div>
