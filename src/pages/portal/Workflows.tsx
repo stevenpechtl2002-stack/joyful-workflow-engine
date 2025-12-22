@@ -4,8 +4,6 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { 
@@ -18,18 +16,8 @@ import {
   Workflow,
   Phone,
   Mic,
-  Settings,
-  ArrowRight,
-  Key
+  ArrowRight
 } from 'lucide-react';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 
 interface WorkflowTemplate {
   id: string;
@@ -95,10 +83,7 @@ const Workflows = () => {
   const [customerWorkflows, setCustomerWorkflows] = useState<CustomerWorkflow[]>([]);
   const [workflowRuns, setWorkflowRuns] = useState<WorkflowRun[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [selectedTemplate, setSelectedTemplate] = useState<WorkflowTemplate | null>(null);
-  const [credentials, setCredentials] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [showCredentialDialog, setShowCredentialDialog] = useState(false);
 
   const fetchData = async () => {
     if (!session?.user?.id) return;
@@ -169,7 +154,7 @@ const Workflows = () => {
     };
   }, [session]);
 
-  const handleSelectTemplate = (template: WorkflowTemplate) => {
+  const handleSelectTemplate = async (template: WorkflowTemplate) => {
     // Check if user already has this workflow
     const existingWorkflow = customerWorkflows.find(cw => cw.template_id === template.id);
     
@@ -181,38 +166,33 @@ const Workflows = () => {
       return;
     }
 
-    const requiredCreds = template.required_credentials as CredentialField[] | null;
-    
-    if (requiredCreds && Array.isArray(requiredCreds) && requiredCreds.length > 0) {
-      setSelectedTemplate(template);
-      setCredentials({});
-      setShowCredentialDialog(true);
-    } else {
-      // No credentials needed, create workflow directly
-      createWorkflow(template, {});
-    }
-  };
-
-  const createWorkflow = async (template: WorkflowTemplate, creds: Record<string, string>) => {
-    if (!session?.user?.id) return;
-    
+    // Create workflow directly without credentials dialog
     setIsSubmitting(true);
     try {
+      // Fetch customer profile for name
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('full_name, company_name, email')
+        .eq('id', session?.user?.id)
+        .single();
+
+      const customerName = profile?.full_name || profile?.company_name || profile?.email || 'Kunde';
+
       // Create customer workflow
       const { data: workflow, error: workflowError } = await supabase
         .from('customer_workflows')
         .insert({
-          user_id: session.user.id,
+          user_id: session!.user.id,
           template_id: template.id,
-          credentials: creds,
-          status: Object.keys(creds).length > 0 ? 'pending_approval' : 'pending_credentials'
+          credentials: {},
+          status: 'pending_approval'
         })
         .select()
         .single();
 
       if (workflowError) throw workflowError;
 
-      // Trigger n8n to set up the workflow
+      // Trigger n8n to set up the workflow with customer info
       const { error: triggerError } = await supabase.functions.invoke('trigger-workflow', {
         body: {
           workflow_id: template.n8n_workflow_id || template.id,
@@ -220,8 +200,11 @@ const Workflows = () => {
           input_data: {
             action: 'setup_workflow',
             template_id: template.id,
+            template_name: template.name,
             customer_workflow_id: workflow.id,
-            credentials: creds
+            customer_name: customerName,
+            customer_email: profile?.email,
+            customer_company: profile?.company_name
           }
         }
       });
@@ -231,15 +214,10 @@ const Workflows = () => {
       }
 
       toast({
-        title: 'Workflow erstellt',
-        description: Object.keys(creds).length > 0 
-          ? 'Ihr Workflow wartet auf Admin-Freigabe (innerhalb von 24 Std.).'
-          : 'Bitte geben Sie die erforderlichen Zugangsdaten ein.',
+        title: 'Workflow angefordert',
+        description: `"${template.name}" wird für Sie eingerichtet. Sie werden benachrichtigt, sobald er aktiv ist.`,
       });
 
-      setShowCredentialDialog(false);
-      setSelectedTemplate(null);
-      setCredentials({});
       fetchData();
     } catch (error: any) {
       console.error('Error creating workflow:', error);
@@ -253,29 +231,6 @@ const Workflows = () => {
     }
   };
 
-  const handleSubmitCredentials = () => {
-    if (!selectedTemplate) return;
-    
-    const requiredCreds = selectedTemplate.required_credentials as CredentialField[] | null;
-    
-    // Validate required fields
-    if (requiredCreds && Array.isArray(requiredCreds)) {
-      const missingFields = requiredCreds
-        .filter(field => field.required && !credentials[field.name]?.trim())
-        .map(field => field.label);
-      
-      if (missingFields.length > 0) {
-        toast({
-          title: 'Fehlende Felder',
-          description: `Bitte füllen Sie aus: ${missingFields.join(', ')}`,
-          variant: 'destructive',
-        });
-        return;
-      }
-    }
-
-    createWorkflow(selectedTemplate, credentials);
-  };
 
   const getStatusLabel = (status: string) => {
     switch (status) {
@@ -307,8 +262,8 @@ const Workflows = () => {
       case 'pending_credentials':
         return (
           <Badge className="bg-orange-500/20 text-orange-400 border-orange-500/30">
-            <Key className="w-3 h-3 mr-1" />
-            Zugangsdaten erforderlich
+            <Clock className="w-3 h-3 mr-1" />
+            Wird eingerichtet
           </Badge>
         );
       case 'approved':
@@ -509,22 +464,6 @@ const Workflows = () => {
                       </div>
                       <div className="flex items-center gap-3">
                         {getStatusBadge(workflow.status)}
-                        {workflow.status === 'pending_credentials' && (
-                          <Button 
-                            size="sm" 
-                            variant="outline"
-                            onClick={() => {
-                              if (template) {
-                                setSelectedTemplate(template);
-                                setCredentials({});
-                                setShowCredentialDialog(true);
-                              }
-                            }}
-                          >
-                            <Settings className="w-4 h-4 mr-2" />
-                            Einrichten
-                          </Button>
-                        )}
                       </div>
                     </div>
                   </CardContent>
@@ -575,64 +514,6 @@ const Workflows = () => {
         </motion.div>
       )}
 
-      {/* Credential Dialog */}
-      <Dialog open={showCredentialDialog} onOpenChange={setShowCredentialDialog}>
-        <DialogContent className="sm:max-w-[500px]">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Key className="w-5 h-5 text-primary" />
-              {selectedTemplate?.name} einrichten
-            </DialogTitle>
-            <DialogDescription>
-              Geben Sie Ihre Zugangsdaten ein. Diese werden sicher gespeichert und nach Admin-Freigabe aktiviert.
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="space-y-4 py-4">
-            {selectedTemplate && Array.isArray(selectedTemplate.required_credentials) && 
-              (selectedTemplate.required_credentials as CredentialField[]).map((field) => (
-                <div key={field.name} className="space-y-2">
-                  <Label htmlFor={field.name}>
-                    {field.label}
-                    {field.required && <span className="text-red-500 ml-1">*</span>}
-                  </Label>
-                  <Input
-                    id={field.name}
-                    type={field.type === 'password' || field.type === 'api_key' ? 'password' : 'text'}
-                    placeholder={field.placeholder || `${field.label} eingeben...`}
-                    value={credentials[field.name] || ''}
-                    onChange={(e) => setCredentials(prev => ({
-                      ...prev,
-                      [field.name]: e.target.value
-                    }))}
-                  />
-                </div>
-              ))
-            }
-          </div>
-
-          <DialogFooter>
-            <Button 
-              variant="outline" 
-              onClick={() => setShowCredentialDialog(false)}
-              disabled={isSubmitting}
-            >
-              Abbrechen
-            </Button>
-            <Button 
-              onClick={handleSubmitCredentials}
-              disabled={isSubmitting}
-            >
-              {isSubmitting ? (
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              ) : (
-                <CheckCircle className="w-4 h-4 mr-2" />
-              )}
-              Speichern & Freigabe anfordern
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 };
