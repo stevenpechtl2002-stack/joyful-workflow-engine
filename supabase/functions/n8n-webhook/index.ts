@@ -43,6 +43,33 @@ serve(async (req: Request): Promise<Response> => {
 
     // Handle different event types from n8n
     switch (event) {
+      case "workflow.complete": {
+        // Handle workflow completion callback
+        if (!data?.run_id) {
+          return new Response(
+            JSON.stringify({ error: "Missing run_id for workflow completion" }),
+            { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
+          );
+        }
+
+        const { error } = await supabase
+          .from("workflow_runs")
+          .update({
+            status: data.status || 'completed',
+            completed_at: new Date().toISOString(),
+            output_data: data.output || {},
+            error_message: data.error || null
+          })
+          .eq("id", data.run_id);
+
+        if (error) throw error;
+        console.log("Workflow run completed:", data.run_id);
+        return new Response(
+          JSON.stringify({ success: true, run_id: data.run_id }),
+          { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
+        );
+      }
+
       case "notification.create": {
         if (!user_id || !data?.title || !data?.message) {
           return new Response(

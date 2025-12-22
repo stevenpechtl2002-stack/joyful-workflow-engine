@@ -14,6 +14,7 @@ import {
   Users,
   Sparkles,
   CreditCard,
+  Workflow,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -29,6 +30,7 @@ const PortalSidebar = () => {
     { icon: LayoutDashboard, label: 'Dashboard', path: '/portal' },
     { icon: Calendar, label: 'Termine', path: '/portal/appointments' },
     { icon: FileText, label: 'Dokumente', path: '/portal/documents' },
+    { icon: Workflow, label: 'Automatisierungen', path: '/portal/workflows' },
     { icon: CreditCard, label: 'Abonnement', path: '/portal/subscriptions' },
     { icon: Bell, label: 'Benachrichtigungen', path: '/portal/notifications' },
     { icon: User, label: 'Profil', path: '/portal/profile' },
