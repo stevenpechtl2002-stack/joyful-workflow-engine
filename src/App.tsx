@@ -16,13 +16,15 @@ import NotFound from "./pages/NotFound";
 import PortalAuth from "./pages/portal/Auth";
 import PortalLayout from "./components/portal/PortalLayout";
 import Dashboard from "./pages/portal/Dashboard";
-import Appointments from "./pages/portal/Appointments";
+import Calendar from "./pages/portal/Calendar";
+import Reservations from "./pages/portal/Reservations";
+import Analytics from "./pages/portal/Analytics";
+import VoiceAgent from "./pages/portal/VoiceAgent";
 import Documents from "./pages/portal/Documents";
 import Notifications from "./pages/portal/Notifications";
 import Profile from "./pages/portal/Profile";
 import Subscriptions from "./pages/portal/Subscriptions";
-import Workflows from "./pages/portal/Workflows";
-import WorkflowSetup from "./pages/portal/WorkflowSetup";
+import Support from "./pages/portal/Support";
 
 const queryClient = new QueryClient();
 
@@ -45,12 +47,14 @@ const App = () => (
             <Route path="/portal/auth" element={<PortalAuth />} />
             <Route path="/portal" element={<PortalLayout />}>
               <Route index element={<Dashboard />} />
-              <Route path="appointments" element={<Appointments />} />
+              <Route path="calendar" element={<Calendar />} />
+              <Route path="reservations" element={<Reservations />} />
+              <Route path="analytics" element={<Analytics />} />
+              <Route path="voice-agent" element={<VoiceAgent />} />
               <Route path="documents" element={<Documents />} />
               <Route path="notifications" element={<Notifications />} />
               <Route path="subscriptions" element={<Subscriptions />} />
-              <Route path="workflows" element={<Workflows />} />
-              <Route path="workflow-setup" element={<WorkflowSetup />} />
+              <Route path="support" element={<Support />} />
               <Route path="profile" element={<Profile />} />
             </Route>
             

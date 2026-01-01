@@ -56,61 +56,103 @@ export type Database = {
         }
         Relationships: []
       }
-      customer_workflows: {
+      call_logs: {
         Row: {
-          activated_at: string | null
-          admin_notes: string | null
-          approved_at: string | null
-          approved_by: string | null
-          configuration: Json | null
+          call_duration: number | null
+          call_outcome: string | null
+          call_status: string
+          caller_phone: string | null
           created_at: string
-          credentials: Json | null
+          ended_at: string | null
           id: string
-          n8n_workflow_id: string | null
-          status: string
-          template_id: string
-          updated_at: string
+          reservation_id: string | null
+          sentiment: string | null
+          started_at: string
+          transcript: string | null
           user_id: string
         }
         Insert: {
-          activated_at?: string | null
-          admin_notes?: string | null
-          approved_at?: string | null
-          approved_by?: string | null
-          configuration?: Json | null
+          call_duration?: number | null
+          call_outcome?: string | null
+          call_status?: string
+          caller_phone?: string | null
           created_at?: string
-          credentials?: Json | null
+          ended_at?: string | null
           id?: string
-          n8n_workflow_id?: string | null
-          status?: string
-          template_id: string
-          updated_at?: string
+          reservation_id?: string | null
+          sentiment?: string | null
+          started_at?: string
+          transcript?: string | null
           user_id: string
         }
         Update: {
-          activated_at?: string | null
-          admin_notes?: string | null
-          approved_at?: string | null
-          approved_by?: string | null
-          configuration?: Json | null
+          call_duration?: number | null
+          call_outcome?: string | null
+          call_status?: string
+          caller_phone?: string | null
           created_at?: string
-          credentials?: Json | null
+          ended_at?: string | null
           id?: string
-          n8n_workflow_id?: string | null
-          status?: string
-          template_id?: string
-          updated_at?: string
+          reservation_id?: string | null
+          sentiment?: string | null
+          started_at?: string
+          transcript?: string | null
           user_id?: string
         }
         Relationships: [
           {
-            foreignKeyName: "customer_workflows_template_id_fkey"
-            columns: ["template_id"]
+            foreignKeyName: "call_logs_reservation_id_fkey"
+            columns: ["reservation_id"]
             isOneToOne: false
-            referencedRelation: "workflow_templates"
+            referencedRelation: "reservations"
             referencedColumns: ["id"]
           },
         ]
+      }
+      daily_stats: {
+        Row: {
+          answered_calls: number | null
+          avg_call_duration: number | null
+          conversion_rate: number | null
+          created_at: string
+          id: string
+          missed_calls: number | null
+          new_customers: number | null
+          reservations_cancelled: number | null
+          reservations_made: number | null
+          stat_date: string
+          total_calls: number | null
+          user_id: string
+        }
+        Insert: {
+          answered_calls?: number | null
+          avg_call_duration?: number | null
+          conversion_rate?: number | null
+          created_at?: string
+          id?: string
+          missed_calls?: number | null
+          new_customers?: number | null
+          reservations_cancelled?: number | null
+          reservations_made?: number | null
+          stat_date: string
+          total_calls?: number | null
+          user_id: string
+        }
+        Update: {
+          answered_calls?: number | null
+          avg_call_duration?: number | null
+          conversion_rate?: number | null
+          created_at?: string
+          id?: string
+          missed_calls?: number | null
+          new_customers?: number | null
+          reservations_cancelled?: number | null
+          reservations_made?: number | null
+          stat_date?: string
+          total_calls?: number | null
+          user_id?: string
+        }
+        Relationships: []
       }
       documents: {
         Row: {
@@ -217,6 +259,99 @@ export type Database = {
         }
         Relationships: []
       }
+      reservations: {
+        Row: {
+          created_at: string
+          customer_email: string | null
+          customer_name: string
+          customer_phone: string | null
+          end_time: string | null
+          id: string
+          notes: string | null
+          party_size: number
+          reservation_date: string
+          reservation_time: string
+          source: string
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          customer_email?: string | null
+          customer_name: string
+          customer_phone?: string | null
+          end_time?: string | null
+          id?: string
+          notes?: string | null
+          party_size?: number
+          reservation_date: string
+          reservation_time: string
+          source?: string
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          customer_email?: string | null
+          customer_name?: string
+          customer_phone?: string | null
+          end_time?: string | null
+          id?: string
+          notes?: string | null
+          party_size?: number
+          reservation_date?: string
+          reservation_time?: string
+          source?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      support_tickets: {
+        Row: {
+          admin_response: string | null
+          category: string | null
+          created_at: string
+          id: string
+          message: string
+          priority: string | null
+          responded_at: string | null
+          status: string
+          subject: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          admin_response?: string | null
+          category?: string | null
+          created_at?: string
+          id?: string
+          message: string
+          priority?: string | null
+          responded_at?: string | null
+          status?: string
+          subject: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          admin_response?: string | null
+          category?: string | null
+          created_at?: string
+          id?: string
+          message?: string
+          priority?: string | null
+          responded_at?: string | null
+          status?: string
+          subject?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -238,93 +373,63 @@ export type Database = {
         }
         Relationships: []
       }
-      workflow_runs: {
+      voice_agent_config: {
         Row: {
-          completed_at: string | null
+          business_name: string | null
           created_at: string
-          error_message: string | null
+          default_responses: Json | null
+          google_calendar_connected: boolean | null
+          google_calendar_token: Json | null
+          greeting_text: string | null
           id: string
-          input_data: Json | null
-          output_data: Json | null
-          started_at: string | null
-          status: string
-          trigger_type: string | null
+          industry: string | null
+          is_active: boolean | null
+          language: string | null
+          opening_hours: Json | null
+          phone_number: string | null
+          reservation_settings: Json | null
           updated_at: string
           user_id: string
-          workflow_id: string
-          workflow_name: string
+          voice: string | null
+          website_url: string | null
         }
         Insert: {
-          completed_at?: string | null
+          business_name?: string | null
           created_at?: string
-          error_message?: string | null
+          default_responses?: Json | null
+          google_calendar_connected?: boolean | null
+          google_calendar_token?: Json | null
+          greeting_text?: string | null
           id?: string
-          input_data?: Json | null
-          output_data?: Json | null
-          started_at?: string | null
-          status?: string
-          trigger_type?: string | null
+          industry?: string | null
+          is_active?: boolean | null
+          language?: string | null
+          opening_hours?: Json | null
+          phone_number?: string | null
+          reservation_settings?: Json | null
           updated_at?: string
           user_id: string
-          workflow_id: string
-          workflow_name: string
+          voice?: string | null
+          website_url?: string | null
         }
         Update: {
-          completed_at?: string | null
+          business_name?: string | null
           created_at?: string
-          error_message?: string | null
+          default_responses?: Json | null
+          google_calendar_connected?: boolean | null
+          google_calendar_token?: Json | null
+          greeting_text?: string | null
           id?: string
-          input_data?: Json | null
-          output_data?: Json | null
-          started_at?: string | null
-          status?: string
-          trigger_type?: string | null
+          industry?: string | null
+          is_active?: boolean | null
+          language?: string | null
+          opening_hours?: Json | null
+          phone_number?: string | null
+          reservation_settings?: Json | null
           updated_at?: string
           user_id?: string
-          workflow_id?: string
-          workflow_name?: string
-        }
-        Relationships: []
-      }
-      workflow_templates: {
-        Row: {
-          category: string | null
-          configuration_schema: Json | null
-          created_at: string
-          description: string | null
-          icon: string | null
-          id: string
-          is_active: boolean | null
-          n8n_workflow_id: string | null
-          name: string
-          required_credentials: Json
-          updated_at: string
-        }
-        Insert: {
-          category?: string | null
-          configuration_schema?: Json | null
-          created_at?: string
-          description?: string | null
-          icon?: string | null
-          id?: string
-          is_active?: boolean | null
-          n8n_workflow_id?: string | null
-          name: string
-          required_credentials?: Json
-          updated_at?: string
-        }
-        Update: {
-          category?: string | null
-          configuration_schema?: Json | null
-          created_at?: string
-          description?: string | null
-          icon?: string | null
-          id?: string
-          is_active?: boolean | null
-          n8n_workflow_id?: string | null
-          name?: string
-          required_credentials?: Json
-          updated_at?: string
+          voice?: string | null
+          website_url?: string | null
         }
         Relationships: []
       }
