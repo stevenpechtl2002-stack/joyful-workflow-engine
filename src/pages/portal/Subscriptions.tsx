@@ -85,11 +85,9 @@ interface SubscriptionStatus {
 }
 
 const Subscriptions = () => {
-  const { session } = useAuth();
+  const { session, subscription, isSubscriptionLoading, checkSubscription } = useAuth();
   const [searchParams] = useSearchParams();
   
-  const [subscriptionStatus, setSubscriptionStatus] = useState<SubscriptionStatus | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
   const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null);
   const [isPortalLoading, setIsPortalLoading] = useState(false);
 
@@ -100,29 +98,16 @@ const Subscriptions = () => {
     } else if (searchParams.get('canceled') === 'true') {
       toast.error('Zahlung abgebrochen');
     }
-  }, [searchParams]);
+  }, [searchParams, checkSubscription]);
 
-  const checkSubscription = async () => {
-    if (!session) return;
-    
-    setIsLoading(true);
-    try {
-      const { data, error } = await supabase.functions.invoke('check-subscription');
-      if (error) throw error;
-      setSubscriptionStatus(data);
-    } catch (error) {
-      console.error('Error checking subscription:', error);
-      setSubscriptionStatus({ subscribed: false, product_id: null, subscription_end: null });
-    } finally {
-      setIsLoading(false);
-    }
+  // Convert AuthContext subscription to local format
+  const subscriptionStatus: SubscriptionStatus = {
+    subscribed: subscription.subscribed,
+    product_id: subscription.productId,
+    subscription_end: subscription.subscriptionEnd
   };
-
-  useEffect(() => {
-    checkSubscription();
-    const interval = setInterval(checkSubscription, 60000);
-    return () => clearInterval(interval);
-  }, [session]);
+  
+  const isLoading = isSubscriptionLoading;
 
   const handleCheckout = async (priceId: string, tierKey: string) => {
     setCheckoutLoading(tierKey);
