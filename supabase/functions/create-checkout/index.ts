@@ -1,7 +1,7 @@
-// Edge Function v2 - 2026-01-07
+// Edge Function v3 - 2026-01-07
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import Stripe from "https://esm.sh/stripe@14.21.0?target=deno";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0?target=deno";
+import Stripe from "https://esm.sh/stripe@18.5.0";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -26,6 +26,14 @@ serve(async (req) => {
   try {
     logStep("Function started");
 
+    // Parse request body for price IDs
+    const { price_id, setup_price_id, setup_months } = await req.json();
+    
+    if (!price_id) {
+      throw new Error("price_id is required");
+    }
+    logStep("Request parsed", { price_id, setup_price_id, setup_months });
+
     const authHeader = req.headers.get("Authorization")!;
     const token = authHeader.replace("Bearer ", "");
     const { data } = await supabaseClient.auth.getUser(token);
@@ -37,7 +45,7 @@ serve(async (req) => {
     logStep("User authenticated", { userId: user.id, email: user.email });
 
     const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", { 
-      apiVersion: "2023-10-16" 
+      apiVersion: "2025-08-27.basil" 
     });
 
     // Check if customer already exists
@@ -48,25 +56,28 @@ serve(async (req) => {
       logStep("Existing customer found", { customerId });
     }
 
+    // Build line items
+    const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = [
+      {
+        price: price_id,
+        quantity: 1,
+      },
+    ];
+
+    // Add setup fee if provided (charged monthly for X months)
+    if (setup_price_id && setup_months) {
+      lineItems.push({
+        price: setup_price_id,
+        quantity: setup_months, // Number of setup rate payments
+      });
+    }
+
     // Create checkout session for subscription with setup fee
-    // Setup fee charged immediately, subscription starts after 30 days
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
       customer_email: customerId ? undefined : user.email,
-      line_items: [
-        {
-          price: "price_1SgxZ6C1vJESw3twMubKeWkR", // Monthly subscription
-          quantity: 1,
-        },
-        {
-          price: "price_1SgxqBC1vJESw3twQieME3hl", // One-time setup fee
-          quantity: 1,
-        },
-      ],
+      line_items: lineItems,
       mode: "subscription",
-      subscription_data: {
-        trial_period_days: 30,
-      },
       success_url: `${req.headers.get("origin")}/portal/subscriptions?success=true`,
       cancel_url: `${req.headers.get("origin")}/portal/subscriptions?canceled=true`,
       metadata: {

@@ -27,27 +27,15 @@ import {
 
 // Subscription tiers configuration
 const TIERS = {
-  starter: {
-    name: 'Starter',
-    price: 199,
-    price_id: 'price_starter', // Placeholder - needs real price ID
-    product_id: 'prod_starter',
-    description: 'Perfekt für kleine Betriebe',
-    features: [
-      'AI Voice Agent',
-      'Bis zu 100 Anrufe/Monat',
-      'Basic Analytics',
-      'E-Mail Support',
-      'Standard Stimme'
-    ],
-    highlighted: false
-  },
-  professional: {
-    name: 'Professional',
+  voiceAgent: {
+    name: 'Voice Agent Pro',
     price: 499,
-    price_id: 'price_1SgxZ6C1vJESw3twMubKeWkR',
-    product_id: 'prod_TeG5dVBHN5lNA5',
-    description: 'Für wachsende Unternehmen',
+    setupPrice: 2500,
+    setupMonths: 2,
+    price_id: 'price_1Sn30uC1vJESw3twc7Re1msF',
+    setup_price_id: 'price_1Sn32mC1vJESw3twLRONtlug',
+    product_id: 'prod_TkY7zmW5P2PUSx',
+    description: 'KI-Sprachassistent mit 24/7 Verfügbarkeit',
     features: [
       'AI Voice Agent',
       'Unbegrenzte Anrufe',
@@ -59,20 +47,26 @@ const TIERS = {
     ],
     highlighted: true
   },
-  enterprise: {
-    name: 'Enterprise',
-    price: 999,
-    price_id: 'price_enterprise', // Placeholder - needs real price ID
-    product_id: 'prod_enterprise',
-    description: 'Maßgeschneiderte Lösungen',
+  voiceAgentSeo: {
+    name: 'Voice Agent + SEO Website',
+    price: 499,
+    setupPrice: 3000,
+    setupMonths: 3,
+    price_id: 'price_1Sn31qC1vJESw3twXvpGGtnW',
+    setup_price_id: 'price_1Sn33mC1vJESw3twoQWy5TJc',
+    product_id: 'prod_TkY8vaLrbXyTAR',
+    description: 'KI-Sprachassistent + SEO-optimierte Website',
     features: [
-      'Alles aus Professional',
-      'Dedizierter Account Manager',
-      'SLA Garantie',
-      'White-Label Option',
-      'API Zugang',
-      'Multi-Standort Support',
-      'Custom Integration'
+      'AI Voice Agent',
+      'Unbegrenzte Anrufe',
+      'Erweiterte Analytics',
+      'Priority Support',
+      'Alle Stimmen',
+      'Kalender-Integration',
+      'Custom Workflows',
+      'SEO-optimierte Website',
+      'Google Ranking Optimierung',
+      'Content Management'
     ],
     highlighted: false
   }
@@ -109,11 +103,18 @@ const Subscriptions = () => {
   
   const isLoading = isSubscriptionLoading;
 
-  const handleCheckout = async (priceId: string, tierKey: string) => {
+  const handleCheckout = async (tierKey: string) => {
+    const tier = TIERS[tierKey as keyof typeof TIERS];
+    if (!tier) return;
+    
     setCheckoutLoading(tierKey);
     try {
       const { data, error } = await supabase.functions.invoke('create-checkout', {
-        body: { price_id: priceId }
+        body: { 
+          price_id: tier.price_id,
+          setup_price_id: tier.setup_price_id,
+          setup_months: tier.setupMonths
+        }
       });
       
       if (error) throw error;
@@ -243,7 +244,7 @@ const Subscriptions = () => {
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.2 }}
       >
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {Object.entries(TIERS).map(([key, tier], index) => {
             const isCurrentPlan = currentTier?.[0] === key && isSubscribed;
             
@@ -282,10 +283,17 @@ const Subscriptions = () => {
                   
                   <CardContent className="flex-1 flex flex-col">
                     {/* Price */}
-                    <div className="mb-6">
+                    <div className="mb-4">
                       <div className="flex items-baseline gap-1">
                         <span className="text-4xl font-bold">€{tier.price}</span>
                         <span className="text-muted-foreground">/Monat</span>
+                      </div>
+                      <div className="mt-2 p-3 rounded-lg bg-muted/50 border border-border/50">
+                        <p className="text-sm font-medium text-foreground">Setup-Kosten</p>
+                        <p className="text-lg font-bold text-primary">€{tier.setupPrice.toLocaleString('de-DE')}</p>
+                        <p className="text-xs text-muted-foreground">
+                          aufgeteilt auf {tier.setupMonths} Monate (€{(tier.setupPrice / tier.setupMonths).toLocaleString('de-DE')}/Monat)
+                        </p>
                       </div>
                     </div>
 
@@ -307,17 +315,11 @@ const Subscriptions = () => {
                         <CheckCircle className="w-4 h-4 mr-2" />
                         Aktueller Plan
                       </Button>
-                    ) : key === 'enterprise' ? (
-                      <Button variant="outline" className="w-full" asChild>
-                        <Link to="/portal/support">
-                          Kontakt aufnehmen
-                        </Link>
-                      </Button>
                     ) : (
                       <Button 
                         variant={tier.highlighted ? "default" : "outline"}
                         className={`w-full ${tier.highlighted ? 'bg-primary' : ''}`}
-                        onClick={() => handleCheckout(tier.price_id, key)}
+                        onClick={() => handleCheckout(key)}
                         disabled={checkoutLoading === key}
                       >
                         {checkoutLoading === key ? (
