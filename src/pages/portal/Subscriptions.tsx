@@ -22,17 +22,20 @@ import {
   Phone,
   BarChart3,
   Calendar,
-  Headphones
+  Headphones,
+  Globe
 } from 'lucide-react';
 
-// Subscription tiers configuration - 12 months minimum contract
+// Combined checkout tiers - Setup fee + delayed subscription
 const TIERS = {
   voiceAgent: {
     name: 'Voice Agent Pro',
-    price: 499,
+    setupPrice: 2500,
+    monthlyPrice: 499,
     minContractMonths: 12,
-    price_id: 'price_1Sn30uC1vJESw3twc7Re1msF',
-    product_id: 'prod_TkY7zmW5P2PUSx',
+    setup_price_id: 'price_1Sn3XAC1vJESw3twhFlgfGCa',
+    subscription_price_id: 'price_1Sn3YtC1vJESw3tw0pxhy28C',
+    product_id: 'prod_TkYgCu8ecKGKAT',
     description: 'KI-Sprachassistent mit 24/7 Verfügbarkeit',
     features: [
       'AI Voice Agent',
@@ -41,16 +44,20 @@ const TIERS = {
       'Priority Support',
       'Alle Stimmen',
       'Kalender-Integration',
-      'Custom Workflows'
+      'Custom Workflows',
+      'N8N Automations',
+      'API Zugang'
     ],
     highlighted: true
   },
   voiceAgentSeo: {
     name: 'Voice Agent + SEO Website',
-    price: 599,
+    setupPrice: 3000,
+    monthlyPrice: 499,
     minContractMonths: 12,
-    price_id: 'price_1Sn31qC1vJESw3twXvpGGtnW',
-    product_id: 'prod_TkY8vaLrbXyTAR',
+    setup_price_id: 'price_1Sn3XtC1vJESw3twBqrEFWMU',
+    subscription_price_id: 'price_1Sn3YtC1vJESw3tw0pxhy28C',
+    product_id: 'prod_TkYgCu8ecKGKAT',
     description: 'KI-Sprachassistent + SEO-optimierte Website',
     features: [
       'AI Voice Agent',
@@ -60,11 +67,13 @@ const TIERS = {
       'Alle Stimmen',
       'Kalender-Integration',
       'Custom Workflows',
+      'N8N Automations',
+      'API Zugang',
       'SEO-optimierte Website',
-      'Google Ranking Optimierung',
       'Content Management'
     ],
-    highlighted: false
+    highlighted: false,
+    hasWebsite: true
   }
 };
 
@@ -83,7 +92,7 @@ const Subscriptions = () => {
 
   useEffect(() => {
     if (searchParams.get('success') === 'true') {
-      toast.success('Zahlung erfolgreich! Ihr Abonnement wurde aktiviert.');
+      toast.success('Zahlung erfolgreich! Ihr Abonnement wird in 30 Tagen aktiviert.');
       checkSubscription();
     } else if (searchParams.get('canceled') === 'true') {
       toast.error('Zahlung abgebrochen');
@@ -106,7 +115,11 @@ const Subscriptions = () => {
     setCheckoutLoading(tierKey);
     try {
       const { data, error } = await supabase.functions.invoke('create-checkout', {
-        body: { price_id: tier.price_id }
+        body: { 
+          setup_price_id: tier.setup_price_id,
+          subscription_price_id: tier.subscription_price_id,
+          tier_name: tier.name
+        }
       });
       
       if (error) throw error;
@@ -263,7 +276,12 @@ const Subscriptions = () => {
                   
                   <CardHeader className={tier.highlighted ? 'pt-10' : ''}>
                     <div className="flex items-center justify-between">
-                      <CardTitle className="text-xl">{tier.name}</CardTitle>
+                      <div className="flex items-center gap-2">
+                        <CardTitle className="text-xl">{tier.name}</CardTitle>
+                        {'hasWebsite' in tier && tier.hasWebsite && (
+                          <Globe className="w-5 h-5 text-primary" />
+                        )}
+                      </div>
                       {isCurrentPlan && (
                         <Badge variant="outline" className="border-primary text-primary">
                           Ihr Plan
@@ -274,15 +292,33 @@ const Subscriptions = () => {
                   </CardHeader>
                   
                   <CardContent className="flex-1 flex flex-col">
-                    {/* Price */}
-                    <div className="mb-6">
-                      <div className="flex items-baseline gap-1">
-                        <span className="text-4xl font-bold">€{tier.price}</span>
-                        <span className="text-muted-foreground">/Monat</span>
+                    {/* Pricing - Setup + Monthly */}
+                    <div className="mb-6 space-y-4">
+                      {/* Setup Fee */}
+                      <div className="p-4 rounded-lg bg-muted/50 border border-border/50">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-medium text-muted-foreground">Einmalige Setup-Gebühr</span>
+                          <Badge variant="secondary">Sofort fällig</Badge>
+                        </div>
+                        <div className="flex items-baseline gap-1 mt-1">
+                          <span className="text-2xl font-bold">€{tier.setupPrice.toLocaleString('de-DE')}</span>
+                        </div>
                       </div>
-                      <p className="mt-1 text-sm text-muted-foreground">
-                        Mindestlaufzeit: {tier.minContractMonths} Monate
-                      </p>
+                      
+                      {/* Monthly Subscription */}
+                      <div className="p-4 rounded-lg bg-primary/5 border border-primary/20">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-medium text-muted-foreground">Monatliches Abo</span>
+                          <Badge className="bg-primary/20 text-primary border-primary/30">Startet nach 30 Tagen</Badge>
+                        </div>
+                        <div className="flex items-baseline gap-1 mt-1">
+                          <span className="text-2xl font-bold">€{tier.monthlyPrice}</span>
+                          <span className="text-muted-foreground">/Monat</span>
+                        </div>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          Mindestlaufzeit: {tier.minContractMonths} Monate
+                        </p>
+                      </div>
                     </div>
 
                     {/* Features */}

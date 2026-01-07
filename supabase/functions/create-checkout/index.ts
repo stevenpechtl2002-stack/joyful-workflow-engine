@@ -1,4 +1,4 @@
-// Edge Function v5 - 12 month minimum contract
+// Edge Function v6 - Combined setup fee + delayed subscription checkout
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@18.5.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
@@ -26,12 +26,12 @@ serve(async (req) => {
   try {
     logStep("Function started");
 
-    const { price_id } = await req.json();
+    const { setup_price_id, subscription_price_id, tier_name } = await req.json();
     
-    if (!price_id) {
-      throw new Error("price_id is required");
+    if (!setup_price_id || !subscription_price_id) {
+      throw new Error("setup_price_id and subscription_price_id are required");
     }
-    logStep("Request parsed", { price_id });
+    logStep("Request parsed", { setup_price_id, subscription_price_id, tier_name });
 
     const authHeader = req.headers.get("Authorization")!;
     const token = authHeader.replace("Bearer ", "");
@@ -55,25 +55,39 @@ serve(async (req) => {
       logStep("Existing customer found", { customerId });
     }
 
-    // Calculate minimum contract end date (12 months from now)
-    const minContractEnd = new Date();
+    // Calculate minimum contract end date (12 months from subscription start, which is 30 days from now)
+    const subscriptionStartDate = new Date();
+    subscriptionStartDate.setDate(subscriptionStartDate.getDate() + 30);
+    
+    const minContractEnd = new Date(subscriptionStartDate);
     minContractEnd.setMonth(minContractEnd.getMonth() + 12);
 
-    // Create subscription checkout with 12 month minimum commitment
+    // Create checkout session with:
+    // 1. One-time setup fee (paid immediately)
+    // 2. Subscription with 30-day trial (first payment after 30 days)
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
       customer_email: customerId ? undefined : user.email,
       line_items: [
+        // Setup fee - one-time payment
         {
-          price: price_id,
+          price: setup_price_id,
+          quantity: 1,
+        },
+        // Monthly subscription with 30-day trial
+        {
+          price: subscription_price_id,
           quantity: 1,
         },
       ],
       mode: "subscription",
       subscription_data: {
+        trial_period_days: 30,
         metadata: {
           min_contract_months: "12",
           min_contract_end: minContractEnd.toISOString(),
+          tier_name: tier_name || "Voice Agent Pro",
+          setup_paid: "true",
         },
       },
       success_url: `${req.headers.get("origin")}/portal/subscriptions?success=true`,
@@ -81,10 +95,15 @@ serve(async (req) => {
       metadata: {
         user_id: user.id,
         min_contract_months: "12",
+        tier_name: tier_name || "Voice Agent Pro",
       },
     });
 
-    logStep("Checkout session created", { sessionId: session.id });
+    logStep("Checkout session created", { 
+      sessionId: session.id, 
+      hasTrialPeriod: true,
+      trialDays: 30 
+    });
 
     return new Response(JSON.stringify({ url: session.url }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
