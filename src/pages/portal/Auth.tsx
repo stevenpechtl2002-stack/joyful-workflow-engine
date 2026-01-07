@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { Mail, Lock, User, ArrowRight, Sparkles, ArrowLeft } from 'lucide-react';
+import { Mail, Lock, User, ArrowRight, Sparkles, ArrowLeft, Shield, Users, Briefcase } from 'lucide-react';
 import { z } from 'zod';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -25,13 +25,16 @@ const signupSchema = loginSchema.extend({
   path: ['confirmPassword'],
 });
 
+type LoginType = 'customer' | 'admin' | 'sales';
+
 const PortalAuth = () => {
   const navigate = useNavigate();
-  const { signIn, signUp, user, isLoading } = useAuth();
+  const { signIn, signUp, user, isLoading, roles } = useAuth();
   const { toast } = useToast();
   
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeTab, setActiveTab] = useState<'login' | 'signup' | 'reset'>('login');
+  const [loginType, setLoginType] = useState<LoginType>('customer');
   const [loginData, setLoginData] = useState({ email: '', password: '' });
   const [signupData, setSignupData] = useState({ 
     email: '', 
@@ -41,11 +44,18 @@ const PortalAuth = () => {
   });
   const [resetEmail, setResetEmail] = useState('');
 
+  // Redirect based on role after login
   useEffect(() => {
-    if (!isLoading && user) {
-      navigate('/portal');
+    if (!isLoading && user && roles.length > 0) {
+      if (roles.includes('admin')) {
+        navigate('/admin');
+      } else if (roles.includes('sales')) {
+        navigate('/sales');
+      } else {
+        navigate('/portal');
+      }
     }
-  }, [user, isLoading, navigate]);
+  }, [user, isLoading, roles, navigate]);
 
   const handlePasswordReset = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -111,7 +121,7 @@ const PortalAuth = () => {
         title: 'Willkommen zurück!',
         description: 'Sie wurden erfolgreich angemeldet.',
       });
-      navigate('/portal');
+      // Navigation handled by useEffect based on role
     }
   };
 
@@ -151,6 +161,35 @@ const PortalAuth = () => {
     }
   };
 
+  const getLoginTypeConfig = (type: LoginType) => {
+    switch (type) {
+      case 'admin':
+        return {
+          icon: Shield,
+          title: 'Admin Login',
+          color: 'text-red-500',
+          bgColor: 'bg-red-500/10',
+          borderColor: 'border-red-500/20',
+        };
+      case 'sales':
+        return {
+          icon: Briefcase,
+          title: 'Vertrieb Login',
+          color: 'text-amber-500',
+          bgColor: 'bg-amber-500/10',
+          borderColor: 'border-amber-500/20',
+        };
+      default:
+        return {
+          icon: Users,
+          title: 'Kunden Login',
+          color: 'text-primary',
+          bgColor: 'bg-primary/10',
+          borderColor: 'border-primary/20',
+        };
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -158,6 +197,8 @@ const PortalAuth = () => {
       </div>
     );
   }
+
+  const currentConfig = getLoginTypeConfig(loginType);
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4 relative overflow-hidden">
@@ -177,10 +218,10 @@ const PortalAuth = () => {
             initial={{ scale: 0.9 }}
             animate={{ scale: 1 }}
             transition={{ duration: 0.3 }}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20 mb-4"
+            className={`inline-flex items-center gap-2 px-4 py-2 rounded-full ${currentConfig.bgColor} border ${currentConfig.borderColor} mb-4`}
           >
-            <Sparkles className="w-4 h-4 text-primary" />
-            <span className="text-sm text-primary font-medium">Kundenportal</span>
+            <currentConfig.icon className={`w-4 h-4 ${currentConfig.color}`} />
+            <span className={`text-sm font-medium ${currentConfig.color}`}>{currentConfig.title}</span>
           </motion.div>
           <h1 className="text-3xl font-display font-bold text-foreground mb-2">
             Willkommen
@@ -190,12 +231,32 @@ const PortalAuth = () => {
           </p>
         </div>
 
+        {/* Login Type Selector */}
+        <div className="flex gap-2 mb-6 justify-center">
+          {(['customer', 'admin', 'sales'] as LoginType[]).map((type) => {
+            const config = getLoginTypeConfig(type);
+            const Icon = config.icon;
+            return (
+              <Button
+                key={type}
+                variant={loginType === type ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setLoginType(type)}
+                className={`flex items-center gap-2 ${loginType === type ? '' : 'bg-secondary/50'}`}
+              >
+                <Icon className="w-4 h-4" />
+                {type === 'customer' ? 'Kunde' : type === 'admin' ? 'Admin' : 'Vertrieb'}
+              </Button>
+            );
+          })}
+        </div>
+
         <Card className="glass border-border/50">
           <CardHeader className="pb-4">
             <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'login' | 'signup' | 'reset')} className="w-full">
               <TabsList className="grid w-full grid-cols-2 bg-secondary/50">
                 <TabsTrigger value="login">Anmelden</TabsTrigger>
-                <TabsTrigger value="signup">Registrieren</TabsTrigger>
+                <TabsTrigger value="signup" disabled={loginType !== 'customer'}>Registrieren</TabsTrigger>
               </TabsList>
               
               <TabsContent value="login" className="mt-6">

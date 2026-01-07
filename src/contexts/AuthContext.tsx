@@ -31,6 +31,8 @@ interface AuthContextType {
   roles: string[];
   isLoading: boolean;
   isAdmin: boolean;
+  isSales: boolean;
+  isCustomer: boolean;
   subscription: SubscriptionInfo;
   isSubscriptionLoading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
@@ -240,6 +242,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const isAdmin = roles.includes('admin');
+  const isSales = roles.includes('sales');
+  const isCustomer = roles.includes('customer');
 
   return (
     <AuthContext.Provider value={{
@@ -249,6 +253,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       roles,
       isLoading,
       isAdmin,
+      isSales,
+      isCustomer,
       subscription,
       isSubscriptionLoading,
       signIn,

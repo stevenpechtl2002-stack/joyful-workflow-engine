@@ -26,6 +26,10 @@ import Profile from "./pages/portal/Profile";
 import Subscriptions from "./pages/portal/Subscriptions";
 import Support from "./pages/portal/Support";
 
+// Admin & Sales Pages
+import AdminDashboard from "./pages/admin/AdminDashboard";
+import SalesDashboard from "./pages/sales/SalesDashboard";
+
 const queryClient = new QueryClient();
 
 const App = () => (
@@ -57,6 +61,12 @@ const App = () => (
               <Route path="support" element={<Support />} />
               <Route path="profile" element={<Profile />} />
             </Route>
+
+            {/* Admin Dashboard */}
+            <Route path="/admin" element={<AdminDashboard />} />
+
+            {/* Sales Dashboard */}
+            <Route path="/sales" element={<SalesDashboard />} />
             
             <Route path="*" element={<NotFound />} />
           </Routes>
