@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Checkbox } from '@/components/ui/checkbox';
 import { 
   Plus, 
   Search, 
@@ -18,7 +19,8 @@ import {
   Calendar,
   Bot,
   User,
-  MoreHorizontal
+  MoreHorizontal,
+  Trash2
 } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useReservations } from '@/hooks/usePortalData';
@@ -32,6 +34,7 @@ const Reservations = () => {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   
   const { data: reservations, isLoading, refetch } = useReservations({ status: statusFilter });
 
@@ -41,6 +44,37 @@ const Reservations = () => {
       res.customer_phone?.includes(searchQuery);
     return matchesSearch;
   }) || [];
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => 
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    );
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.length === filteredReservations.length) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(filteredReservations.map(r => r.id));
+    }
+  };
+
+  const deleteSelected = async () => {
+    if (selectedIds.length === 0) return;
+    
+    const { error } = await supabase
+      .from('reservations')
+      .delete()
+      .in('id', selectedIds);
+    
+    if (error) {
+      toast.error('Fehler beim Löschen');
+    } else {
+      toast.success(`${selectedIds.length} Reservierung(en) gelöscht`);
+      setSelectedIds([]);
+      refetch();
+    }
+  };
 
   const updateStatus = async (id: string, status: string) => {
     const { error } = await supabase
@@ -93,20 +127,32 @@ const Reservations = () => {
           </p>
         </div>
         
-        <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
-          <DialogTrigger asChild>
-            <Button className="bg-primary text-primary-foreground">
-              <Plus className="w-4 h-4 mr-2" />
-              Neue Reservierung
+        <div className="flex items-center gap-2">
+          {selectedIds.length > 0 && (
+            <Button 
+              variant="destructive" 
+              onClick={deleteSelected}
+            >
+              <Trash2 className="w-4 h-4 mr-2" />
+              {selectedIds.length} löschen
             </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-lg">
-            <DialogHeader>
-              <DialogTitle>Neue Reservierung</DialogTitle>
-            </DialogHeader>
-            <ReservationForm onSuccess={() => { setIsFormOpen(false); refetch(); }} />
-          </DialogContent>
-        </Dialog>
+          )}
+          
+          <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
+            <DialogTrigger asChild>
+              <Button className="bg-primary text-primary-foreground">
+                <Plus className="w-4 h-4 mr-2" />
+                Neue Reservierung
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-lg">
+              <DialogHeader>
+                <DialogTitle>Neue Reservierung</DialogTitle>
+              </DialogHeader>
+              <ReservationForm onSuccess={() => { setIsFormOpen(false); refetch(); }} />
+            </DialogContent>
+          </Dialog>
+        </div>
       </motion.div>
 
       {/* Filters */}
@@ -165,6 +211,12 @@ const Reservations = () => {
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead className="w-12">
+                        <Checkbox 
+                          checked={selectedIds.length === filteredReservations.length && filteredReservations.length > 0}
+                          onCheckedChange={toggleSelectAll}
+                        />
+                      </TableHead>
                       <TableHead>Datum</TableHead>
                       <TableHead>Zeit</TableHead>
                       <TableHead>Kunde</TableHead>
@@ -178,6 +230,12 @@ const Reservations = () => {
                   <TableBody>
                     {filteredReservations.map((res) => (
                       <TableRow key={res.id}>
+                        <TableCell>
+                          <Checkbox 
+                            checked={selectedIds.includes(res.id)}
+                            onCheckedChange={() => toggleSelect(res.id)}
+                          />
+                        </TableCell>
                         <TableCell className="font-medium">
                           {format(new Date(res.reservation_date), 'dd.MM.yyyy', { locale: de })}
                         </TableCell>
