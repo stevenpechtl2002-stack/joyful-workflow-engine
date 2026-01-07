@@ -64,6 +64,16 @@ serve(async (req: Request): Promise<Response> => {
       );
     }
 
+    // Convert DD.MM.YYYY to YYYY-MM-DD if needed
+    let reservationDate = payload.reservation_date;
+    if (reservationDate.includes('.')) {
+      const parts = reservationDate.split('.');
+      if (parts.length === 3) {
+        reservationDate = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+      }
+    }
+    console.log("Converted date:", reservationDate);
+
     const { data: reservation, error: reservationError } = await supabase
       .from("reservations")
       .insert({
@@ -71,7 +81,7 @@ serve(async (req: Request): Promise<Response> => {
         customer_name: payload.customer_name,
         customer_phone: payload.customer_phone || null,
         customer_email: payload.customer_email || null,
-        reservation_date: payload.reservation_date,
+        reservation_date: reservationDate,
         reservation_time: payload.reservation_time,
         end_time: payload.end_time || null,
         party_size: payload.party_size || 2,
