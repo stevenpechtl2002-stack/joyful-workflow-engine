@@ -12,7 +12,7 @@ import { useToast } from '@/hooks/use-toast';
 import { 
   Users, Phone, Calendar, DollarSign, Activity, 
   Search, Filter, LogOut, Shield, Ban, CheckCircle,
-  TrendingUp, Clock, FileText, Key, Copy, Eye, EyeOff
+  TrendingUp, Clock, FileText, Key, Copy, Eye, EyeOff, Link2
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
@@ -74,13 +74,15 @@ const AdminDashboard = () => {
     });
   };
 
-  const copyToClipboard = (text: string) => {
+  const copyToClipboard = (text: string, label?: string) => {
     navigator.clipboard.writeText(text);
     toast({
       title: 'Kopiert',
-      description: 'API-Key in die Zwischenablage kopiert',
+      description: label ? `${label} in die Zwischenablage kopiert` : 'In die Zwischenablage kopiert',
     });
   };
+
+  const webhookBaseUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/n8n-reservations`;
 
   // Redirect if not admin
   useEffect(() => {
@@ -325,9 +327,9 @@ const AdminDashboard = () => {
                       <TableHead>E-Mail</TableHead>
                       <TableHead>Firma</TableHead>
                       <TableHead>API-Key</TableHead>
+                      <TableHead>Webhook-URL</TableHead>
                       <TableHead>Plan</TableHead>
                       <TableHead>Status</TableHead>
-                      <TableHead>Erstellt</TableHead>
                       <TableHead>Aktionen</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -359,7 +361,22 @@ const AdminDashboard = () => {
                               variant="ghost"
                               size="sm"
                               className="h-7 w-7 p-0"
-                              onClick={() => copyToClipboard(customer.api_key)}
+                              onClick={() => copyToClipboard(customer.api_key, 'API-Key')}
+                            >
+                              <Copy className="w-3 h-3" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1">
+                            <code className="text-xs bg-muted px-2 py-1 rounded max-w-[180px] truncate">
+                              {webhookBaseUrl}
+                            </code>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 w-7 p-0"
+                              onClick={() => copyToClipboard(webhookBaseUrl, 'Webhook-URL')}
                             >
                               <Copy className="w-3 h-3" />
                             </Button>
@@ -374,9 +391,6 @@ const AdminDashboard = () => {
                           <Badge variant={customer.status === 'active' ? 'default' : 'destructive'}>
                             {customer.status === 'active' ? 'Aktiv' : 'Gesperrt'}
                           </Badge>
-                        </TableCell>
-                        <TableCell>
-                          {format(new Date(customer.created_at), 'dd.MM.yyyy', { locale: de })}
                         </TableCell>
                         <TableCell>
                           <Button
