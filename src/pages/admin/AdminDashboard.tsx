@@ -12,7 +12,7 @@ import { useToast } from '@/hooks/use-toast';
 import { 
   Users, Phone, Calendar, DollarSign, Activity, 
   Search, Filter, LogOut, Shield, Ban, CheckCircle,
-  TrendingUp, Clock, FileText
+  TrendingUp, Clock, FileText, Key, Copy, Eye, EyeOff
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
@@ -26,6 +26,7 @@ interface Customer {
   created_at: string;
   notes: string | null;
   sales_rep_id: string | null;
+  api_key: string;
 }
 
 interface CallLog {
@@ -59,6 +60,27 @@ const AdminDashboard = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [dataLoading, setDataLoading] = useState(true);
+  const [visibleApiKeys, setVisibleApiKeys] = useState<Set<string>>(new Set());
+
+  const toggleApiKeyVisibility = (customerId: string) => {
+    setVisibleApiKeys(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(customerId)) {
+        newSet.delete(customerId);
+      } else {
+        newSet.add(customerId);
+      }
+      return newSet;
+    });
+  };
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    toast({
+      title: 'Kopiert',
+      description: 'API-Key in die Zwischenablage kopiert',
+    });
+  };
 
   // Redirect if not admin
   useEffect(() => {
@@ -302,6 +324,7 @@ const AdminDashboard = () => {
                     <TableRow>
                       <TableHead>E-Mail</TableHead>
                       <TableHead>Firma</TableHead>
+                      <TableHead>API-Key</TableHead>
                       <TableHead>Plan</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Erstellt</TableHead>
@@ -313,6 +336,35 @@ const AdminDashboard = () => {
                       <TableRow key={customer.id}>
                         <TableCell className="font-medium">{customer.email}</TableCell>
                         <TableCell>{customer.company_name || '-'}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1">
+                            <code className="text-xs bg-muted px-2 py-1 rounded max-w-[140px] truncate">
+                              {visibleApiKeys.has(customer.id) 
+                                ? customer.api_key 
+                                : '••••••••••••'}
+                            </code>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 w-7 p-0"
+                              onClick={() => toggleApiKeyVisibility(customer.id)}
+                            >
+                              {visibleApiKeys.has(customer.id) ? (
+                                <EyeOff className="w-3 h-3" />
+                              ) : (
+                                <Eye className="w-3 h-3" />
+                              )}
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 w-7 p-0"
+                              onClick={() => copyToClipboard(customer.api_key)}
+                            >
+                              <Copy className="w-3 h-3" />
+                            </Button>
+                          </div>
+                        </TableCell>
                         <TableCell>
                           <Badge variant={customer.plan === 'enterprise' ? 'default' : 'secondary'}>
                             {customer.plan}
@@ -343,7 +395,7 @@ const AdminDashboard = () => {
                     ))}
                     {filteredCustomers.length === 0 && (
                       <TableRow>
-                        <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                        <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
                           Keine Kunden gefunden
                         </TableCell>
                       </TableRow>
