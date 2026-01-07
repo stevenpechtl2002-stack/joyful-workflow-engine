@@ -109,6 +109,36 @@ export type Database = {
           },
         ]
       }
+      customers: {
+        Row: {
+          company_name: string | null
+          created_at: string
+          email: string
+          id: string
+          plan: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          company_name?: string | null
+          created_at?: string
+          email: string
+          id: string
+          plan?: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          company_name?: string | null
+          created_at?: string
+          email?: string
+          id?: string
+          plan?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       daily_stats: {
         Row: {
           answered_calls: number | null
