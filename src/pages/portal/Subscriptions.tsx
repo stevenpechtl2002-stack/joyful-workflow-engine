@@ -25,16 +25,12 @@ import {
   Headphones
 } from 'lucide-react';
 
-// Subscription tiers configuration
+// Subscription tiers configuration - Simple monthly subscriptions
 const TIERS = {
   voiceAgent: {
     name: 'Voice Agent Pro',
     price: 499,
-    setupPrice: 2500,
-    setupMonths: 2,
-    minContractMonths: 12,
     price_id: 'price_1Sn30uC1vJESw3twc7Re1msF',
-    setup_price_id: 'price_1Sn32mC1vJESw3twLRONtlug',
     product_id: 'prod_TkY7zmW5P2PUSx',
     description: 'KI-Sprachassistent mit 24/7 Verfügbarkeit',
     features: [
@@ -50,12 +46,8 @@ const TIERS = {
   },
   voiceAgentSeo: {
     name: 'Voice Agent + SEO Website',
-    price: 499,
-    setupPrice: 3000,
-    setupMonths: 3,
-    minContractMonths: 12,
+    price: 599,
     price_id: 'price_1Sn31qC1vJESw3twXvpGGtnW',
-    setup_price_id: 'price_1Sn33mC1vJESw3twoQWy5TJc',
     product_id: 'prod_TkY8vaLrbXyTAR',
     description: 'KI-Sprachassistent + SEO-optimierte Website',
     features: [
@@ -112,11 +104,7 @@ const Subscriptions = () => {
     setCheckoutLoading(tierKey);
     try {
       const { data, error } = await supabase.functions.invoke('create-checkout', {
-        body: { 
-          price_id: tier.price_id,
-          setup_price_id: tier.setup_price_id,
-          setup_months: tier.setupMonths
-        }
+        body: { price_id: tier.price_id }
       });
       
       if (error) throw error;
@@ -285,20 +273,13 @@ const Subscriptions = () => {
                   
                   <CardContent className="flex-1 flex flex-col">
                     {/* Price */}
-                    <div className="mb-4">
+                    <div className="mb-6">
                       <div className="flex items-baseline gap-1">
                         <span className="text-4xl font-bold">€{tier.price}</span>
                         <span className="text-muted-foreground">/Monat</span>
                       </div>
-                      <div className="mt-2 p-3 rounded-lg bg-muted/50 border border-border/50">
-                        <p className="text-sm font-medium text-foreground">Setup-Kosten</p>
-                        <p className="text-lg font-bold text-primary">€{tier.setupPrice.toLocaleString('de-DE')}</p>
-                        <p className="text-xs text-muted-foreground">
-                          aufgeteilt auf {tier.setupMonths} Monate (€{(tier.setupPrice / tier.setupMonths).toLocaleString('de-DE')}/Monat)
-                        </p>
-                      </div>
-                      <p className="mt-2 text-xs text-muted-foreground text-center">
-                        Mindestlaufzeit: {tier.minContractMonths} Monate
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        Monatlich kündbar
                       </p>
                     </div>
 

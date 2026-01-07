@@ -1,4 +1,4 @@
-// Edge Function v3 - 2026-01-07
+// Edge Function v4 - Simple subscription checkout
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@18.5.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
@@ -26,13 +26,12 @@ serve(async (req) => {
   try {
     logStep("Function started");
 
-    // Parse request body for price IDs
-    const { price_id, setup_price_id, setup_months } = await req.json();
+    const { price_id } = await req.json();
     
     if (!price_id) {
       throw new Error("price_id is required");
     }
-    logStep("Request parsed", { price_id, setup_price_id, setup_months });
+    logStep("Request parsed", { price_id });
 
     const authHeader = req.headers.get("Authorization")!;
     const token = authHeader.replace("Bearer ", "");
@@ -56,32 +55,17 @@ serve(async (req) => {
       logStep("Existing customer found", { customerId });
     }
 
-    // Build line items
-    const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = [
-      {
-        price: price_id,
-        quantity: 1,
-      },
-    ];
-
-    // Add setup fee if provided (charged monthly for X months)
-    if (setup_price_id && setup_months) {
-      lineItems.push({
-        price: setup_price_id,
-        quantity: setup_months, // Number of setup rate payments
-      });
-    }
-
-    // Create checkout session for subscription with setup fee
-    // Setup fee charged immediately, subscription starts after 30 days
+    // Create simple subscription checkout
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
       customer_email: customerId ? undefined : user.email,
-      line_items: lineItems,
+      line_items: [
+        {
+          price: price_id,
+          quantity: 1,
+        },
+      ],
       mode: "subscription",
-      subscription_data: {
-        trial_period_days: 30,
-      },
       success_url: `${req.headers.get("origin")}/portal/subscriptions?success=true`,
       cancel_url: `${req.headers.get("origin")}/portal/subscriptions?canceled=true`,
       metadata: {
