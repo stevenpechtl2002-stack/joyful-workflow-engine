@@ -25,6 +25,7 @@ import Notifications from "./pages/portal/Notifications";
 import Profile from "./pages/portal/Profile";
 import Subscriptions from "./pages/portal/Subscriptions";
 import Support from "./pages/portal/Support";
+import ApiSettings from "./pages/portal/ApiSettings";
 
 // Admin & Sales Pages
 import AdminDashboard from "./pages/admin/AdminDashboard";
@@ -60,6 +61,7 @@ const App = () => (
               <Route path="subscriptions" element={<Subscriptions />} />
               <Route path="support" element={<Support />} />
               <Route path="profile" element={<Profile />} />
+              <Route path="api-settings" element={<ApiSettings />} />
             </Route>
 
             {/* Admin Dashboard */}
