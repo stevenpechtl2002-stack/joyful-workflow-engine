@@ -412,9 +412,23 @@ const AdminDashboard = () => {
                     <TableBody>
                       {stripeSubscriptions.map((sub) => {
                         const status = formatSubscriptionStatus(sub.status);
-                        const trialEnd = sub.trial_end ? new Date(sub.trial_end * 1000) : null;
-                        const periodEnd = new Date(sub.current_period_end * 1000);
-                        const minContractEnd = sub.metadata.min_contract_end ? new Date(sub.metadata.min_contract_end) : null;
+                        
+                        // Safe date parsing with validation
+                        const parseTimestamp = (ts: number | null | undefined) => {
+                          if (!ts || ts <= 0) return null;
+                          const date = new Date(ts * 1000);
+                          return isNaN(date.getTime()) ? null : date;
+                        };
+                        
+                        const parseISODate = (isoString: string | null | undefined) => {
+                          if (!isoString) return null;
+                          const date = new Date(isoString);
+                          return isNaN(date.getTime()) ? null : date;
+                        };
+                        
+                        const trialEnd = parseTimestamp(sub.trial_end);
+                        const periodEnd = parseTimestamp(sub.current_period_end);
+                        const minContractEnd = parseISODate(sub.metadata?.min_contract_end);
                         
                         return (
                           <TableRow key={sub.id}>
@@ -426,14 +440,14 @@ const AdminDashboard = () => {
                             </TableCell>
                             <TableCell>
                               <Badge variant="outline">
-                                {sub.metadata.tier_name || 'Voice Agent Pro'}
+                                {sub.metadata?.tier_name || 'Voice Agent Pro'}
                               </Badge>
                             </TableCell>
                             <TableCell>
                               <Badge variant={status.variant}>{status.label}</Badge>
                             </TableCell>
                             <TableCell>
-                              {sub.metadata.setup_paid === 'true' ? (
+                              {sub.metadata?.setup_paid === 'true' ? (
                                 <Badge className="bg-green-500/20 text-green-400 border-green-500/30">
                                   <CheckCircle className="w-3 h-3 mr-1" />
                                   Bezahlt
@@ -452,7 +466,7 @@ const AdminDashboard = () => {
                               )}
                             </TableCell>
                             <TableCell>
-                              {format(periodEnd, 'dd.MM.yyyy', { locale: de })}
+                              {periodEnd ? format(periodEnd, 'dd.MM.yyyy', { locale: de }) : '-'}
                             </TableCell>
                             <TableCell>
                               {minContractEnd ? (
