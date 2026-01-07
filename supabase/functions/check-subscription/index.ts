@@ -31,10 +31,21 @@ serve(async (req) => {
     if (!stripeKey) throw new Error("STRIPE_SECRET_KEY is not set");
 
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader) throw new Error("No authorization header provided");
+    if (!authHeader?.startsWith("Bearer ")) {
+      throw new Error("No authorization header provided");
+    }
 
-    const token = authHeader.replace("Bearer ", "");
-    const { data: userData, error: userError } = await supabaseClient.auth.getUser(token);
+    // Create a new client with the user's token to get user info
+    const userClient = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
+      { 
+        auth: { persistSession: false },
+        global: { headers: { Authorization: authHeader } }
+      }
+    );
+
+    const { data: userData, error: userError } = await userClient.auth.getUser();
     
     if (userError) throw new Error(`Authentication error: ${userError.message}`);
     
