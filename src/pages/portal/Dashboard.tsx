@@ -17,13 +17,16 @@ import {
 import { Link } from 'react-router-dom';
 import { PieChart, Pie, Cell, ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, BarChart, Bar } from 'recharts';
 import { useDashboardStats, useReservations, useDailyStats } from '@/hooks/usePortalData';
+import { useRealtimeSubscription } from '@/hooks/useRealtimeSubscription';
 
 const Dashboard = () => {
   const { profile } = useAuth();
   const { data: stats, isLoading: statsLoading, refetch } = useDashboardStats();
   const { data: reservations } = useReservations();
   const { data: dailyStats } = useDailyStats(14);
-
+  
+  // Enable realtime updates
+  useRealtimeSubscription();
   const getGreeting = () => {
     const hour = new Date().getHours();
     if (hour < 12) return 'Guten Morgen';
