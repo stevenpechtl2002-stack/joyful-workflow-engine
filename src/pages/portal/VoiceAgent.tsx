@@ -73,17 +73,8 @@ const VoiceAgent = () => {
 
       if (error) throw error;
 
-      // Send config to n8n
-      try {
-        await supabase.functions.invoke('trigger-workflow', {
-          body: { 
-            action: 'voice_agent_config_update',
-            config: formData 
-          }
-        });
-      } catch (e) {
-        console.log('N8N notification skipped');
-      }
+      // Config saved successfully - no need to trigger workflow for simple config updates
+      // The workflow will be triggered separately when needed
 
       toast.success('Konfiguration gespeichert');
       refetch();
