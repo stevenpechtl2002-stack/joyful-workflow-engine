@@ -38,8 +38,8 @@ const Analytics = () => {
 
   const kpiCards = [
     { 
-      label: 'Gesamte Anrufe', 
-      value: (stats?.answeredCalls || 0) + (stats?.missedCalls || 0), 
+      label: 'Beantwortete Anrufe', 
+      value: stats?.answeredCalls || 0, 
       icon: Phone, 
       color: 'text-primary',
       bgColor: 'bg-primary/10',
@@ -57,13 +57,6 @@ const Analytics = () => {
       icon: PhoneOff, 
       color: 'text-orange-500',
       bgColor: 'bg-orange-500/10',
-    },
-    { 
-      label: 'Verpasste Anrufe', 
-      value: stats?.missedCalls || 0, 
-      icon: PhoneMissed, 
-      color: 'text-red-500',
-      bgColor: 'bg-red-500/10',
     },
     { 
       label: 'Conversion Rate', 

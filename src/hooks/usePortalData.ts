@@ -33,12 +33,6 @@ export const useDashboardStats = () => {
         .eq('user_id', user.id)
         .eq('call_status', 'completed');
       
-      // Get missed calls
-      const { count: missedCalls } = await supabase
-        .from('call_logs')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', user.id)
-        .eq('call_status', 'missed');
       
       // Get new customers (unique phone numbers this month)
       const startOfMonth = new Date();
@@ -54,23 +48,22 @@ export const useDashboardStats = () => {
       
       const uniqueCustomers = new Set(newCustomerData?.map(r => r.customer_phone)).size;
       
-      // Calculate conversion rate
-      const totalCalls = (answeredCalls || 0) + (missedCalls || 0);
+      // Calculate conversion rate based on answered calls that resulted in reservations
       const { count: successfulReservations } = await supabase
         .from('call_logs')
         .select('*', { count: 'exact', head: true })
         .eq('user_id', user.id)
         .eq('call_outcome', 'reservation_made');
       
-      const conversionRate = totalCalls > 0 
-        ? Math.round(((successfulReservations || 0) / totalCalls) * 100) 
+      // Conversion rate: successful reservations / answered calls
+      const conversionRate = (answeredCalls || 0) > 0 
+        ? Math.round(((successfulReservations || 0) / (answeredCalls || 1)) * 100) 
         : 0;
       
       return {
         totalReservations: totalReservations || 0,
         todayReservations: todayReservations || 0,
         answeredCalls: answeredCalls || 0,
-        missedCalls: missedCalls || 0,
         newCustomers: uniqueCustomers,
         conversionRate
       };

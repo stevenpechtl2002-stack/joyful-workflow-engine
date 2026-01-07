@@ -6,7 +6,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { 
   Calendar, 
   Phone, 
-  PhoneMissed,
   Users,
   TrendingUp,
   CheckCircle2,
@@ -40,11 +39,35 @@ const Dashboard = () => {
     { name: 'Abgeschlossen', value: reservations?.filter(r => r.status === 'completed').length || 0, color: '#3b82f6' },
   ].filter(d => d.value > 0);
 
-  const trendData = dailyStats?.map(stat => ({
-    date: new Date(stat.stat_date).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' }),
-    calls: stat.total_calls,
-    reservations: stat.reservations_made
-  })) || [];
+
+  // Prepare upcoming reservations data for chart (when no daily_stats)
+  const upcomingReservationsData = reservations
+    ?.filter(r => new Date(r.reservation_date) >= new Date())
+    .slice(0, 14)
+    .reduce((acc, r) => {
+      const dateKey = new Date(r.reservation_date).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
+      const existing = acc.find(item => item.date === dateKey);
+      if (existing) {
+        existing.reservations += 1;
+      } else {
+        acc.push({ date: dateKey, reservations: 1, calls: 0 });
+      }
+      return acc;
+    }, [] as { date: string; reservations: number; calls: number }[]) || [];
+
+  const trendData = dailyStats && dailyStats.length > 0 
+    ? dailyStats.map(stat => ({
+        date: new Date(stat.stat_date).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' }),
+        calls: stat.total_calls,
+        reservations: stat.reservations_made
+      }))
+    : upcomingReservationsData;
+
+  // Count upcoming reservations (pending/confirmed with future date)
+  const upcomingReservationsCount = reservations?.filter(r => 
+    (r.status === 'pending' || r.status === 'confirmed') && 
+    new Date(r.reservation_date) >= new Date()
+  ).length || 0;
 
   const kpiCards = [
     { 
@@ -57,8 +80,8 @@ const Dashboard = () => {
       trendUp: true
     },
     { 
-      label: 'Reservierungen heute', 
-      value: stats?.todayReservations ?? 0, 
+      label: 'Anstehende Reservierungen', 
+      value: upcomingReservationsCount, 
       icon: Clock, 
       color: 'text-blue-500',
       bgColor: 'bg-blue-500/10',
@@ -71,15 +94,6 @@ const Dashboard = () => {
       bgColor: 'bg-green-500/10',
       trend: '+8%',
       trendUp: true
-    },
-    { 
-      label: 'Verpasste Anrufe', 
-      value: stats?.missedCalls ?? 0, 
-      icon: PhoneMissed, 
-      color: 'text-red-500',
-      bgColor: 'bg-red-500/10',
-      trend: '-5%',
-      trendUp: false
     },
     { 
       label: 'Conversion Rate', 
@@ -122,7 +136,7 @@ const Dashboard = () => {
       </motion.div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
         {kpiCards.map((kpi, index) => (
           <motion.div
             key={kpi.label}
