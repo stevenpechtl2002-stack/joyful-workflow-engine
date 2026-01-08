@@ -175,22 +175,48 @@ serve(async (req) => {
         const startTime = `${date}T${time}:00`;
         const endTime = new Date(new Date(startTime).getTime() + duration_minutes * 60000).toISOString();
 
-        // Double-check availability
-        const { data: conflicts } = await supabase
+        const requestedStart = new Date(startTime);
+        const requestedEnd = new Date(endTime);
+
+        // Double-check availability with FULL appointment data
+        const { data: existingAppointments, error: checkError } = await supabase
           .from('appointments')
-          .select('id')
+          .select('id, start_time, end_time')
           .eq('user_id', userId)
           .neq('status', 'cancelled')
           .gte('start_time', `${date}T00:00:00`)
           .lte('start_time', `${date}T23:59:59`);
 
-        const requestedStart = new Date(startTime);
-        const requestedEnd = new Date(endTime);
-        
-        const hasConflict = conflicts?.some(apt => {
-          // We need full apt data, re-fetch if needed
-          return false; // Simplified - in production, do proper conflict check
+        if (checkError) {
+          console.error('Availability check error:', checkError);
+          throw checkError;
+        }
+
+        // Proper conflict check with time overlap detection
+        const hasConflict = existingAppointments?.some(apt => {
+          const aptStart = new Date(apt.start_time);
+          const aptEnd = new Date(apt.end_time);
+          // Check if times overlap
+          return (requestedStart < aptEnd && requestedEnd > aptStart);
         });
+
+        if (hasConflict) {
+          // Find alternative slots
+          const alternativeSlots = findAvailableSlots(date, existingAppointments || [], businessHours);
+          
+          return new Response(
+            JSON.stringify({
+              success: false,
+              error: 'Termin bereits belegt',
+              message: `Der Termin am ${formatDate(date)} um ${time} Uhr ist leider schon vergeben.`,
+              alternative_slots: alternativeSlots,
+              alternative_message: alternativeSlots.length > 0
+                ? `Alternativ hätte ich folgende Zeiten frei: ${alternativeSlots.join(', ')} Uhr.`
+                : 'An diesem Tag sind leider keine Termine mehr frei.'
+            }),
+            { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
 
         // Insert the appointment
         const { data: newAppointment, error } = await supabase
