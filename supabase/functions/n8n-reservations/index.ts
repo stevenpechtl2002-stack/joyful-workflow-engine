@@ -74,6 +74,80 @@ serve(async (req: Request): Promise<Response> => {
     }
     console.log("Converted date:", reservationDate);
 
+    // Check for existing reservations at this time
+    const { data: existingReservations, error: checkError } = await supabase
+      .from("reservations")
+      .select("id, reservation_time, end_time")
+      .eq("user_id", customer.id)
+      .eq("reservation_date", reservationDate)
+      .neq("status", "cancelled");
+
+    if (checkError) {
+      console.error("Error checking existing reservations:", checkError);
+      throw checkError;
+    }
+
+    // Calculate end time (default 90 minutes if not provided)
+    const requestedTime = payload.reservation_time;
+    const [reqHour, reqMin] = requestedTime.split(':').map(Number);
+    const requestedStart = new Date(`${reservationDate}T${requestedTime}:00`);
+    const durationMinutes = 90;
+    const requestedEnd = new Date(requestedStart.getTime() + durationMinutes * 60000);
+
+    // Check for time conflicts
+    const hasConflict = existingReservations?.some(res => {
+      const resStart = new Date(`${reservationDate}T${res.reservation_time}:00`);
+      const resEnd = res.end_time 
+        ? new Date(`${reservationDate}T${res.end_time}:00`)
+        : new Date(resStart.getTime() + durationMinutes * 60000);
+      
+      // Check if times overlap
+      return (requestedStart < resEnd && requestedEnd > resStart);
+    });
+
+    if (hasConflict) {
+      console.log("Time slot conflict detected for:", requestedTime);
+      
+      // Find available alternative slots
+      const businessHours = { start: 11, end: 22 };
+      const availableSlots: string[] = [];
+      
+      for (let hour = businessHours.start; hour < businessHours.end; hour++) {
+        for (const minute of [0, 30]) {
+          const slotTime = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+          const slotStart = new Date(`${reservationDate}T${slotTime}:00`);
+          const slotEnd = new Date(slotStart.getTime() + durationMinutes * 60000);
+          
+          const slotHasConflict = existingReservations?.some(res => {
+            const resStart = new Date(`${reservationDate}T${res.reservation_time}:00`);
+            const resEnd = res.end_time 
+              ? new Date(`${reservationDate}T${res.end_time}:00`)
+              : new Date(resStart.getTime() + durationMinutes * 60000);
+            return (slotStart < resEnd && slotEnd > resStart);
+          });
+          
+          if (!slotHasConflict && availableSlots.length < 5) {
+            availableSlots.push(slotTime);
+          }
+        }
+      }
+
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "TIME_SLOT_OCCUPIED",
+          message: `Der Termin um ${requestedTime} Uhr am ${payload.reservation_date} ist bereits belegt.`,
+          alternative_slots: availableSlots,
+          alternative_message: availableSlots.length > 0
+            ? `Verfügbare Zeiten: ${availableSlots.map(s => s + ' Uhr').join(', ')}`
+            : 'An diesem Tag sind leider keine Termine mehr frei.'
+        }),
+        { status: 409, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+
+    const endTimeString = `${requestedEnd.getHours().toString().padStart(2, '0')}:${requestedEnd.getMinutes().toString().padStart(2, '0')}`;
+
     const { data: reservation, error: reservationError } = await supabase
       .from("reservations")
       .insert({
@@ -83,7 +157,7 @@ serve(async (req: Request): Promise<Response> => {
         customer_email: payload.customer_email || null,
         reservation_date: reservationDate,
         reservation_time: payload.reservation_time,
-        end_time: payload.end_time || null,
+        end_time: payload.end_time || endTimeString,
         party_size: payload.party_size || 2,
         notes: payload.notes || null,
         source: payload.source || 'n8n',
@@ -113,7 +187,10 @@ serve(async (req: Request): Promise<Response> => {
       JSON.stringify({ 
         success: true, 
         reservation_id: reservation.id,
-        message: "Reservation created successfully"
+        message: "Reservierung erfolgreich erstellt",
+        reservation_date: payload.reservation_date,
+        reservation_time: payload.reservation_time,
+        end_time: endTimeString
       }),
       { status: 201, headers: { "Content-Type": "application/json", ...corsHeaders } }
     );
