@@ -1,5 +1,8 @@
 project_id = "avfafxojrijfsgsyimwx"
 
+[functions.check-availability]
+verify_jwt = false
+
 [functions.n8n-reservations]
 verify_jwt = false
 
