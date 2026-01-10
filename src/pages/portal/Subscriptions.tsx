@@ -45,7 +45,7 @@ const TIERS = {
       'Alle Stimmen',
       'Kalender-Integration',
       'Custom Workflows',
-      'N8N Automations',
+      'Custom Automatisierung',
       'API Zugang'
     ],
     highlighted: true
@@ -67,10 +67,9 @@ const TIERS = {
       'Alle Stimmen',
       'Kalender-Integration',
       'Custom Workflows',
-      'N8N Automations',
+      'Custom Automatisierung',
       'API Zugang',
-      'SEO-optimierte Website',
-      'Content Management'
+      'SEO-optimierte Website'
     ],
     highlighted: false,
     hasWebsite: true
