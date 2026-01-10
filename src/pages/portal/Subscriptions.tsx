@@ -31,7 +31,7 @@ const TIERS = {
   voiceAgent: {
     name: 'Voice Agent Pro',
     setupPrice: 2500,
-    monthlyPrice: 499,
+    monthlyPrice: 500,
     minContractMonths: 12,
     setup_price_id: 'price_1Sn3XAC1vJESw3twhFlgfGCa',
     subscription_price_id: 'price_1Sn3YtC1vJESw3tw0pxhy28C',
@@ -53,7 +53,7 @@ const TIERS = {
   voiceAgentSeo: {
     name: 'Voice Agent + SEO Website',
     setupPrice: 3000,
-    monthlyPrice: 499,
+    monthlyPrice: 500,
     minContractMonths: 12,
     setup_price_id: 'price_1Sn3XtC1vJESw3twBqrEFWMU',
     subscription_price_id: 'price_1Sn3YtC1vJESw3tw0pxhy28C',
