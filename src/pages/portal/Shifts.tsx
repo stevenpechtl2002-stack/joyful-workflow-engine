@@ -18,7 +18,7 @@ import {
   DialogClose
 } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ChevronLeft, ChevronRight, Clock, CalendarDays, Save, Copy, UserCircle } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Clock, CalendarDays, Save, Copy, UserCircle, Users } from 'lucide-react';
 import { format, startOfWeek, addDays, addWeeks, subWeeks, isSameDay } from 'date-fns';
 import { de } from 'date-fns/locale';
 import { toast } from 'sonner';
@@ -47,6 +47,13 @@ const Shifts = () => {
     endTime: string;
     isWorking: boolean;
   } | null>(null);
+  
+  // Bulk edit state
+  const [isBulkDialogOpen, setIsBulkDialogOpen] = useState(false);
+  const [bulkStartTime, setBulkStartTime] = useState(DEFAULT_START);
+  const [bulkEndTime, setBulkEndTime] = useState(DEFAULT_END);
+  const [bulkDays, setBulkDays] = useState<number[]>([0, 1, 2, 3, 4]); // Mo-Fr default
+  const [bulkIsWorking, setBulkIsWorking] = useState(true);
 
   const weekDays = useMemo(() => {
     return Array.from({ length: 7 }, (_, i) => addDays(currentWeek, i));
@@ -102,6 +109,59 @@ const Shifts = () => {
     toast.success('Woche wurde kopiert');
   };
 
+  const handleBulkApply = () => {
+    const newSchedules: ShiftSchedule[] = [];
+    
+    activeStaff.forEach((staff) => {
+      bulkDays.forEach((dayIndex) => {
+        const date = weekDays[dayIndex];
+        const existingIndex = schedules.findIndex(
+          s => s.staffId === staff.id && isSameDay(s.date, date)
+        );
+        
+        const newSchedule: ShiftSchedule = {
+          staffId: staff.id,
+          date,
+          startTime: bulkStartTime,
+          endTime: bulkEndTime,
+          isWorking: bulkIsWorking
+        };
+        
+        if (existingIndex >= 0) {
+          // Will be updated later
+          newSchedules.push({ ...newSchedule, staffId: staff.id });
+        } else {
+          newSchedules.push(newSchedule);
+        }
+      });
+    });
+    
+    // Update existing and add new
+    const updatedSchedules = [...schedules];
+    newSchedules.forEach((newSched) => {
+      const existingIndex = updatedSchedules.findIndex(
+        s => s.staffId === newSched.staffId && isSameDay(s.date, newSched.date)
+      );
+      if (existingIndex >= 0) {
+        updatedSchedules[existingIndex] = newSched;
+      } else {
+        updatedSchedules.push(newSched);
+      }
+    });
+    
+    setSchedules(updatedSchedules);
+    setIsBulkDialogOpen(false);
+    toast.success(`Zeiten auf ${activeStaff.length} Mitarbeiter angewendet`);
+  };
+
+  const toggleBulkDay = (dayIndex: number) => {
+    if (bulkDays.includes(dayIndex)) {
+      setBulkDays(bulkDays.filter(d => d !== dayIndex));
+    } else {
+      setBulkDays([...bulkDays, dayIndex].sort());
+    }
+  };
+
   const getInitials = (name: string) => {
     return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
   };
@@ -141,6 +201,84 @@ const Shifts = () => {
             <Copy className="w-4 h-4" />
             Woche kopieren
           </Button>
+          
+          <Dialog open={isBulkDialogOpen} onOpenChange={setIsBulkDialogOpen}>
+            <DialogTrigger asChild>
+              <Button className="gap-2">
+                <Users className="w-4 h-4" />
+                Alle bearbeiten
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle>Zeiten auf alle Mitarbeiter anwenden</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="flex items-center justify-between">
+                  <Label>Arbeitet</Label>
+                  <Switch
+                    checked={bulkIsWorking}
+                    onCheckedChange={setBulkIsWorking}
+                  />
+                </div>
+                
+                {bulkIsWorking && (
+                  <>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>Beginn</Label>
+                        <Input
+                          type="time"
+                          value={bulkStartTime}
+                          onChange={(e) => setBulkStartTime(e.target.value)}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Ende</Label>
+                        <Input
+                          type="time"
+                          value={bulkEndTime}
+                          onChange={(e) => setBulkEndTime(e.target.value)}
+                        />
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label>Tage auswählen</Label>
+                      <div className="flex flex-wrap gap-2">
+                        {WEEKDAYS.map((day, index) => (
+                          <button
+                            key={day}
+                            onClick={() => toggleBulkDay(index)}
+                            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                              bulkDays.includes(index)
+                                ? 'bg-primary text-primary-foreground'
+                                : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                            }`}
+                          >
+                            {day.slice(0, 2)}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </>
+                )}
+                
+                <div className="text-sm text-muted-foreground">
+                  Diese Zeiten werden auf <span className="font-medium text-foreground">{activeStaff.length} Mitarbeiter</span> für die ausgewählten Tage angewendet.
+                </div>
+              </div>
+              <DialogFooter>
+                <DialogClose asChild>
+                  <Button variant="outline">Abbrechen</Button>
+                </DialogClose>
+                <Button onClick={handleBulkApply} className="gap-2" disabled={bulkDays.length === 0}>
+                  <Save className="w-4 h-4" />
+                  Auf alle anwenden
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
 

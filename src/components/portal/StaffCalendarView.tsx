@@ -38,6 +38,7 @@ export const StaffCalendarView = () => {
   const [draggedReservation, setDraggedReservation] = useState<string | null>(null);
 
   const { staffMembers } = useStaffMembers();
+  const activeStaffMembers = staffMembers.filter(s => s.is_active);
   const { data: reservations = [], refetch } = useReservations();
   const updateStaffMutation = useUpdateReservationStaff();
 
@@ -226,7 +227,7 @@ export const StaffCalendarView = () => {
       </div>
 
       {/* Staff columns */}
-      {staffMembers.map((staff: StaffMember) => (
+      {activeStaffMembers.map((staff: StaffMember) => (
         <div key={staff.id} className="flex-shrink-0 w-40 border-r border-border/30">
           {/* Staff header */}
           <div className="h-12 border-b border-border/50 flex items-center justify-center gap-2 px-2">
@@ -284,7 +285,7 @@ export const StaffCalendarView = () => {
         </div>
       ))}
 
-      {staffMembers.length === 0 && (
+      {activeStaffMembers.length === 0 && (
         <div className="flex-1 flex items-center justify-center min-h-[400px] text-muted-foreground">
           <div className="text-center">
             <p className="mb-2">Keine Mitarbeiter vorhanden</p>
@@ -323,7 +324,7 @@ export const StaffCalendarView = () => {
             </div>
 
             {/* Staff columns */}
-            {staffMembers.map((staff: StaffMember) => (
+            {activeStaffMembers.map((staff: StaffMember) => (
               <div key={staff.id} className="flex-shrink-0 w-32 border-r border-border/30">
                 <div
                   className="relative"
@@ -401,9 +402,9 @@ export const StaffCalendarView = () => {
       </div>
 
       {/* Staff header row (for day view) */}
-      {viewMode === 'day' && staffMembers.length > 0 && (
+      {viewMode === 'day' && activeStaffMembers.length > 0 && (
         <div className="flex gap-1 overflow-x-auto pb-2">
-          {staffMembers.map((staff: StaffMember) => (
+          {activeStaffMembers.map((staff: StaffMember) => (
             <div
               key={staff.id}
               className="flex items-center gap-2 px-3 py-1.5 rounded-full"
