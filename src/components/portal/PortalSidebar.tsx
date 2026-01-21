@@ -11,12 +11,12 @@ import {
   LogOut,
   ChevronLeft,
   ChevronRight,
-  Cog,
   Users,
   Sparkles,
   CreditCard,
   Workflow,
-  Key,
+  Package,
+  UserPlus,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -31,6 +31,8 @@ const PortalSidebar = () => {
   const menuItems = [
     { icon: LayoutDashboard, label: 'Dashboard', path: '/portal' },
     { icon: Calendar, label: 'Kalender', path: '/portal/calendar' },
+    { icon: Package, label: 'Produkte', path: '/portal/products' },
+    { icon: UserPlus, label: 'Kunden', path: '/portal/customers' },
     { icon: Users, label: 'Mitarbeiter', path: '/portal/staff' },
     { icon: Workflow, label: 'Dienstplan', path: '/portal/shifts' },
     { icon: FileText, label: 'Reservierungen', path: '/portal/reservations' },
@@ -40,7 +42,7 @@ const PortalSidebar = () => {
   ];
 
   const adminItems = [
-    { icon: Users, label: 'Kunden', path: '/portal/admin/users' },
+    { icon: Users, label: 'Admin Kunden', path: '/portal/admin/users' },
     { icon: Settings, label: 'Einstellungen', path: '/portal/admin/settings' },
   ];
 

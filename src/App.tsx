@@ -28,6 +28,8 @@ import Profile from "./pages/portal/Profile";
 import Subscriptions from "./pages/portal/Subscriptions";
 import Support from "./pages/portal/Support";
 import ApiSettings from "./pages/portal/ApiSettings";
+import Products from "./pages/portal/Products";
+import Customers from "./pages/portal/Customers";
 
 // Admin & Sales Pages
 import AdminDashboard from "./pages/admin/AdminDashboard";
@@ -55,6 +57,8 @@ const App = () => (
             <Route path="/portal" element={<PortalLayout />}>
               <Route index element={<Dashboard />} />
               <Route path="calendar" element={<Calendar />} />
+              <Route path="products" element={<Products />} />
+              <Route path="customers" element={<Customers />} />
               <Route path="staff" element={<Staff />} />
               <Route path="shifts" element={<Shifts />} />
               <Route path="reservations" element={<Reservations />} />
