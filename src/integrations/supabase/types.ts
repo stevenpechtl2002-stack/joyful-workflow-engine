@@ -109,6 +109,69 @@ export type Database = {
           },
         ]
       }
+      contacts: {
+        Row: {
+          birth_day: number | null
+          birth_month: number | null
+          birthdate: string | null
+          booking_count: number | null
+          consent_status: string | null
+          created_at: string
+          email: string | null
+          first_name: string | null
+          gender: string | null
+          id: string
+          info: string | null
+          language: string | null
+          last_name: string | null
+          name: string
+          original_created_at: string | null
+          phone: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          birth_day?: number | null
+          birth_month?: number | null
+          birthdate?: string | null
+          booking_count?: number | null
+          consent_status?: string | null
+          created_at?: string
+          email?: string | null
+          first_name?: string | null
+          gender?: string | null
+          id?: string
+          info?: string | null
+          language?: string | null
+          last_name?: string | null
+          name: string
+          original_created_at?: string | null
+          phone?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          birth_day?: number | null
+          birth_month?: number | null
+          birthdate?: string | null
+          booking_count?: number | null
+          consent_status?: string | null
+          created_at?: string
+          email?: string | null
+          first_name?: string | null
+          gender?: string | null
+          id?: string
+          info?: string | null
+          language?: string | null
+          last_name?: string | null
+          name?: string
+          original_created_at?: string | null
+          phone?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       customers: {
         Row: {
           api_key: string
