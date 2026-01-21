@@ -3,9 +3,9 @@ import { motion } from 'framer-motion';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { ChevronLeft, ChevronRight, Plus } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, User, Phone, Mail, Clock, Calendar, Users, FileText } from 'lucide-react';
 import { format, addDays, subDays, startOfWeek, endOfWeek, eachDayOfInterval, isSameDay } from 'date-fns';
 import { de } from 'date-fns/locale';
 import { useStaffMembers, useUpdateReservationStaff, StaffMember } from '@/hooks/useStaffMembers';
@@ -18,6 +18,8 @@ type StaffViewMode = 'day' | 'week';
 interface Reservation {
   id: string;
   customer_name: string;
+  customer_phone?: string | null;
+  customer_email?: string | null;
   reservation_date: string;
   reservation_time: string;
   end_time: string | null;
@@ -25,6 +27,7 @@ interface Reservation {
   notes: string | null;
   status: string;
   staff_member_id?: string | null;
+  source?: string | null;
 }
 
 const HOURS = Array.from({ length: 14 }, (_, i) => i + 9); // 09:00 - 22:00
@@ -36,6 +39,8 @@ export const StaffCalendarView = () => {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState<{ date: Date; time: string; staffId: string } | null>(null);
   const [draggedReservation, setDraggedReservation] = useState<string | null>(null);
+  const [selectedReservation, setSelectedReservation] = useState<Reservation | null>(null);
+  const [isDetailOpen, setIsDetailOpen] = useState(false);
 
   const { staffMembers } = useStaffMembers();
   const activeStaffMembers = staffMembers.filter(s => s.is_active);
@@ -168,6 +173,38 @@ export const StaffCalendarView = () => {
     }
   };
 
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case 'confirmed': return 'Bestätigt';
+      case 'pending': return 'Ausstehend';
+      case 'cancelled': return 'Storniert';
+      case 'completed': return 'Abgeschlossen';
+      default: return status;
+    }
+  };
+
+  const getSourceLabel = (source?: string | null) => {
+    switch (source) {
+      case 'voice_agent': return 'Telefonassistent';
+      case 'n8n': return 'Automatisierung';
+      case 'manual': return 'Manuell';
+      case 'web': return 'Webseite';
+      default: return source || 'Unbekannt';
+    }
+  };
+
+  const handleReservationClick = (e: React.MouseEvent, res: Reservation) => {
+    e.stopPropagation();
+    setSelectedReservation(res);
+    setIsDetailOpen(true);
+  };
+
+  const getStaffName = (staffId?: string | null) => {
+    if (!staffId) return 'Nicht zugewiesen';
+    const staff = activeStaffMembers.find(s => s.id === staffId);
+    return staff?.name || 'Unbekannt';
+  };
+
   // Render single day columns
   const renderDayView = () => (
     <div className="flex overflow-x-auto">
@@ -212,7 +249,8 @@ export const StaffCalendarView = () => {
               animate={{ opacity: 1, scale: 1 }}
               draggable
               onDragStart={(e) => handleDragStart(e as unknown as React.DragEvent, res.id)}
-              className={`absolute left-1 right-1 rounded-md px-2 py-1 cursor-move shadow-sm border border-white/20 ${getStatusColor(res.status)} text-white`}
+              onClick={(e) => handleReservationClick(e as unknown as React.MouseEvent, res)}
+              className={`absolute left-1 right-1 rounded-md px-2 py-1 cursor-pointer shadow-sm border border-white/20 ${getStatusColor(res.status)} text-white hover:ring-2 hover:ring-white/50 transition-all`}
               style={{
                 top: calculateBlockPosition(res.reservation_time),
                 height: calculateBlockHeight(res.reservation_time, res.end_time),
@@ -264,7 +302,8 @@ export const StaffCalendarView = () => {
                 animate={{ opacity: 1, scale: 1 }}
                 draggable
                 onDragStart={(e) => handleDragStart(e as unknown as React.DragEvent, res.id)}
-                className="absolute left-1 right-1 rounded-md px-2 py-1 cursor-move shadow-sm text-white overflow-hidden"
+                onClick={(e) => handleReservationClick(e as unknown as React.MouseEvent, res)}
+                className="absolute left-1 right-1 rounded-md px-2 py-1 cursor-pointer shadow-sm text-white overflow-hidden hover:ring-2 hover:ring-white/50 transition-all"
                 style={{
                   top: calculateBlockPosition(res.reservation_time),
                   height: calculateBlockHeight(res.reservation_time, res.end_time),
@@ -339,7 +378,8 @@ export const StaffCalendarView = () => {
                       animate={{ opacity: 1 }}
                       draggable
                       onDragStart={(e) => handleDragStart(e as unknown as React.DragEvent, res.id)}
-                      className="absolute left-0.5 right-0.5 rounded px-1 py-0.5 cursor-move text-white text-[10px]"
+                      onClick={(e) => handleReservationClick(e as unknown as React.MouseEvent, res)}
+                      className="absolute left-0.5 right-0.5 rounded px-1 py-0.5 cursor-pointer text-white text-[10px] hover:ring-2 hover:ring-white/50 transition-all"
                       style={{
                         top: calculateBlockPosition(res.reservation_time) / 2,
                         height: Math.max(20, calculateBlockHeight(res.reservation_time, res.end_time) / 2),
@@ -443,6 +483,119 @@ export const StaffCalendarView = () => {
                 : undefined
             }
           />
+        </DialogContent>
+      </Dialog>
+
+      {/* Reservation detail dialog */}
+      <Dialog open={isDetailOpen} onOpenChange={setIsDetailOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <User className="w-5 h-5" />
+              Reservierungsdetails
+            </DialogTitle>
+            <DialogDescription>
+              Details zur ausgewählten Reservierung
+            </DialogDescription>
+          </DialogHeader>
+          
+          {selectedReservation && (
+            <div className="space-y-4">
+              {/* Status Badge */}
+              <div className="flex items-center justify-between">
+                <Badge className={`${getStatusColor(selectedReservation.status)} text-white`}>
+                  {getStatusLabel(selectedReservation.status)}
+                </Badge>
+                <span className="text-xs text-muted-foreground">
+                  Quelle: {getSourceLabel(selectedReservation.source)}
+                </span>
+              </div>
+
+              {/* Customer Info */}
+              <div className="bg-muted/50 rounded-lg p-4 space-y-3">
+                <div className="flex items-center gap-3">
+                  <User className="w-4 h-4 text-muted-foreground" />
+                  <div>
+                    <p className="text-sm text-muted-foreground">Kunde</p>
+                    <p className="font-medium">{selectedReservation.customer_name}</p>
+                  </div>
+                </div>
+
+                {selectedReservation.customer_phone && (
+                  <div className="flex items-center gap-3">
+                    <Phone className="w-4 h-4 text-muted-foreground" />
+                    <div>
+                      <p className="text-sm text-muted-foreground">Telefon</p>
+                      <p className="font-medium">{selectedReservation.customer_phone}</p>
+                    </div>
+                  </div>
+                )}
+
+                {selectedReservation.customer_email && (
+                  <div className="flex items-center gap-3">
+                    <Mail className="w-4 h-4 text-muted-foreground" />
+                    <div>
+                      <p className="text-sm text-muted-foreground">E-Mail</p>
+                      <p className="font-medium">{selectedReservation.customer_email}</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Appointment Details */}
+              <div className="bg-muted/50 rounded-lg p-4 space-y-3">
+                <div className="flex items-center gap-3">
+                  <Calendar className="w-4 h-4 text-muted-foreground" />
+                  <div>
+                    <p className="text-sm text-muted-foreground">Datum</p>
+                    <p className="font-medium">
+                      {format(new Date(selectedReservation.reservation_date), 'EEEE, d. MMMM yyyy', { locale: de })}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <Clock className="w-4 h-4 text-muted-foreground" />
+                  <div>
+                    <p className="text-sm text-muted-foreground">Uhrzeit</p>
+                    <p className="font-medium">
+                      {selectedReservation.reservation_time.slice(0, 5)} 
+                      {selectedReservation.end_time && ` - ${selectedReservation.end_time.slice(0, 5)}`} Uhr
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <Users className="w-4 h-4 text-muted-foreground" />
+                  <div>
+                    <p className="text-sm text-muted-foreground">Mitarbeiter</p>
+                    <p className="font-medium">{getStaffName(selectedReservation.staff_member_id)}</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <Users className="w-4 h-4 text-muted-foreground" />
+                  <div>
+                    <p className="text-sm text-muted-foreground">Personenanzahl</p>
+                    <p className="font-medium">{selectedReservation.party_size} Person(en)</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Notes */}
+              {selectedReservation.notes && (
+                <div className="bg-muted/50 rounded-lg p-4">
+                  <div className="flex items-start gap-3">
+                    <FileText className="w-4 h-4 text-muted-foreground mt-0.5" />
+                    <div>
+                      <p className="text-sm text-muted-foreground">Notizen / Dienstleistung</p>
+                      <p className="font-medium whitespace-pre-wrap">{selectedReservation.notes}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>
