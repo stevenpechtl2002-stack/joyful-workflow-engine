@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { useStaffMembers } from '@/hooks/useStaffMembers';
+import { useReservations } from '@/hooks/usePortalData';
+import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -7,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { 
   Dialog, 
   DialogContent, 
@@ -27,7 +30,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { Plus, Pencil, Trash2, GripVertical, UserCircle } from 'lucide-react';
+import { Plus, Pencil, Trash2, GripVertical, UserCircle, ArrowRight } from 'lucide-react';
 import { toast } from 'sonner';
 
 const COLORS = [
@@ -37,10 +40,22 @@ const COLORS = [
 
 const Staff = () => {
   const { staffMembers, isLoading, createStaffMember, updateStaffMember, deleteStaffMember } = useStaffMembers();
+  const { data: reservations = [], refetch: refetchReservations } = useReservations();
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingStaff, setEditingStaff] = useState<any>(null);
   const [newStaffName, setNewStaffName] = useState('');
   const [newStaffColor, setNewStaffColor] = useState(COLORS[0]);
+  
+  // Deactivation with reassignment
+  const [deactivatingStaff, setDeactivatingStaff] = useState<any>(null);
+  const [reassignToStaffId, setReassignToStaffId] = useState<string>('none');
+  
+  const activeStaffMembers = staffMembers.filter(s => s.is_active);
+  
+  // Get reservations assigned to a specific staff member
+  const getStaffReservationCount = (staffId: string) => {
+    return reservations.filter(r => r.staff_member_id === staffId).length;
+  };
 
   const handleAddStaff = async () => {
     if (!newStaffName.trim()) {
@@ -94,14 +109,75 @@ const Staff = () => {
   };
 
   const handleToggleActive = async (staff: any) => {
+    // If activating, just do it
+    if (!staff.is_active) {
+      try {
+        await updateStaffMember({
+          id: staff.id,
+          is_active: true
+        });
+        toast.success('Mitarbeiter aktiviert');
+      } catch (error) {
+        toast.error('Fehler beim Aktivieren');
+      }
+      return;
+    }
+    
+    // If deactivating, check for assigned reservations
+    const reservationCount = getStaffReservationCount(staff.id);
+    if (reservationCount > 0) {
+      setDeactivatingStaff(staff);
+      setReassignToStaffId('none');
+    } else {
+      // No reservations, just deactivate
+      try {
+        await updateStaffMember({
+          id: staff.id,
+          is_active: false
+        });
+        toast.success('Mitarbeiter deaktiviert');
+      } catch (error) {
+        toast.error('Fehler beim Deaktivieren');
+      }
+    }
+  };
+
+  const handleConfirmDeactivation = async () => {
+    if (!deactivatingStaff) return;
+    
     try {
+      // Reassign reservations if a target was selected
+      if (reassignToStaffId && reassignToStaffId !== 'none') {
+        const { error: reassignError } = await supabase
+          .from('reservations')
+          .update({ staff_member_id: reassignToStaffId })
+          .eq('staff_member_id', deactivatingStaff.id);
+        
+        if (reassignError) throw reassignError;
+        
+        const targetStaff = staffMembers.find(s => s.id === reassignToStaffId);
+        toast.success(`Termine wurden zu ${targetStaff?.name} verschoben`);
+      } else {
+        // Remove staff assignment from reservations
+        const { error: removeError } = await supabase
+          .from('reservations')
+          .update({ staff_member_id: null })
+          .eq('staff_member_id', deactivatingStaff.id);
+        
+        if (removeError) throw removeError;
+      }
+      
+      // Now deactivate the staff member
       await updateStaffMember({
-        id: staff.id,
-        is_active: !staff.is_active
+        id: deactivatingStaff.id,
+        is_active: false
       });
-      toast.success(staff.is_active ? 'Mitarbeiter deaktiviert' : 'Mitarbeiter aktiviert');
+      
+      refetchReservations();
+      setDeactivatingStaff(null);
+      toast.success('Mitarbeiter deaktiviert');
     } catch (error) {
-      toast.error('Fehler beim Aktualisieren des Status');
+      toast.error('Fehler beim Deaktivieren');
     }
   };
 
@@ -311,6 +387,78 @@ const Staff = () => {
           ))
         )}
       </div>
+
+      {/* Deactivation Dialog with Reassignment */}
+      <Dialog open={!!deactivatingStaff} onOpenChange={(open) => !open && setDeactivatingStaff(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Mitarbeiter deaktivieren</DialogTitle>
+          </DialogHeader>
+          {deactivatingStaff && (
+            <div className="space-y-4 py-4">
+              <div className="flex items-center gap-3 p-3 bg-muted rounded-lg">
+                <Avatar className="w-10 h-10 border-2" style={{ borderColor: deactivatingStaff.color }}>
+                  <AvatarFallback style={{ backgroundColor: deactivatingStaff.color + '20', color: deactivatingStaff.color }}>
+                    {getInitials(deactivatingStaff.name)}
+                  </AvatarFallback>
+                </Avatar>
+                <div>
+                  <p className="font-medium">{deactivatingStaff.name}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {getStaffReservationCount(deactivatingStaff.id)} zugewiesene Termine
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Termine verschieben zu</Label>
+                <Select value={reassignToStaffId} onValueChange={setReassignToStaffId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Mitarbeiter auswählen" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">
+                      <span className="text-muted-foreground">Keine Zuordnung (Termine ohne Mitarbeiter)</span>
+                    </SelectItem>
+                    {activeStaffMembers
+                      .filter(s => s.id !== deactivatingStaff.id)
+                      .map((staff) => (
+                        <SelectItem key={staff.id} value={staff.id}>
+                          <div className="flex items-center gap-2">
+                            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: staff.color }} />
+                            {staff.name}
+                          </div>
+                        </SelectItem>
+                      ))
+                    }
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {reassignToStaffId && reassignToStaffId !== 'none' && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <ArrowRight className="w-4 h-4" />
+                  <span>
+                    {getStaffReservationCount(deactivatingStaff.id)} Termine werden zu{' '}
+                    <span className="font-medium text-foreground">
+                      {staffMembers.find(s => s.id === reassignToStaffId)?.name}
+                    </span>{' '}
+                    verschoben
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeactivatingStaff(null)}>
+              Abbrechen
+            </Button>
+            <Button onClick={handleConfirmDeactivation}>
+              Deaktivieren
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
