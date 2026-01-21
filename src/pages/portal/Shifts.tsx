@@ -1,9 +1,9 @@
 import { useState, useMemo } from 'react';
 import { useStaffMembers } from '@/hooks/useStaffMembers';
+import { useStaffShifts } from '@/hooks/useStaffShifts';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -18,28 +18,18 @@ import {
   DialogClose
 } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ChevronLeft, ChevronRight, Clock, CalendarDays, Save, Copy, UserCircle, Users } from 'lucide-react';
-import { format, startOfWeek, addDays, addWeeks, subWeeks, isSameDay } from 'date-fns';
-import { de } from 'date-fns/locale';
+import { Clock, CalendarDays, Save, UserCircle, Users, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
-
-interface ShiftSchedule {
-  staffId: string;
-  date: Date;
-  startTime: string;
-  endTime: string;
-  isWorking: boolean;
-}
 
 const WEEKDAYS = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];
 const DEFAULT_START = '09:00';
 const DEFAULT_END = '18:00';
 
 const Shifts = () => {
-  const { staffMembers, isLoading } = useStaffMembers();
-  const [currentWeek, setCurrentWeek] = useState(startOfWeek(new Date(), { weekStartsOn: 1 }));
+  const { staffMembers, isLoading: staffLoading } = useStaffMembers();
+  const { shifts, isLoading: shiftsLoading, upsertShift, upsertBulkShifts, getShiftForStaffAndDay, isUpserting, isBulkUpserting } = useStaffShifts();
+  
   const [selectedStaff, setSelectedStaff] = useState<string | null>(null);
-  const [schedules, setSchedules] = useState<ShiftSchedule[]>([]);
   const [editingSchedule, setEditingSchedule] = useState<{
     staffId: string;
     dayIndex: number;
@@ -55,103 +45,34 @@ const Shifts = () => {
   const [bulkDays, setBulkDays] = useState<number[]>([0, 1, 2, 3, 4]); // Mo-Fr default
   const [bulkIsWorking, setBulkIsWorking] = useState(true);
 
-  const weekDays = useMemo(() => {
-    return Array.from({ length: 7 }, (_, i) => addDays(currentWeek, i));
-  }, [currentWeek]);
-
-  const getScheduleForDay = (staffId: string, date: Date): ShiftSchedule | undefined => {
-    return schedules.find(s => s.staffId === staffId && isSameDay(s.date, date));
-  };
-
-  const handlePrevWeek = () => setCurrentWeek(subWeeks(currentWeek, 1));
-  const handleNextWeek = () => setCurrentWeek(addWeeks(currentWeek, 1));
-  const handleToday = () => setCurrentWeek(startOfWeek(new Date(), { weekStartsOn: 1 }));
-
-  const handleSaveSchedule = () => {
+  const handleSaveSchedule = async () => {
     if (!editingSchedule) return;
 
-    const date = weekDays[editingSchedule.dayIndex];
-    const existingIndex = schedules.findIndex(
-      s => s.staffId === editingSchedule.staffId && isSameDay(s.date, date)
-    );
-
-    const newSchedule: ShiftSchedule = {
-      staffId: editingSchedule.staffId,
-      date,
-      startTime: editingSchedule.startTime,
-      endTime: editingSchedule.endTime,
-      isWorking: editingSchedule.isWorking
-    };
-
-    if (existingIndex >= 0) {
-      const updated = [...schedules];
-      updated[existingIndex] = newSchedule;
-      setSchedules(updated);
-    } else {
-      setSchedules([...schedules, newSchedule]);
-    }
+    await upsertShift.mutateAsync({
+      staff_member_id: editingSchedule.staffId,
+      day_of_week: editingSchedule.dayIndex,
+      start_time: editingSchedule.startTime,
+      end_time: editingSchedule.endTime,
+      is_working: editingSchedule.isWorking
+    });
 
     setEditingSchedule(null);
     toast.success('Dienstplan gespeichert');
   };
 
-  const handleCopyWeek = () => {
-    // Copy current week to next week
-    const nextWeekStart = addWeeks(currentWeek, 1);
-    const newSchedules = schedules
-      .filter(s => weekDays.some(d => isSameDay(s.date, d)))
-      .map(s => ({
-        ...s,
-        date: addWeeks(s.date, 1)
-      }));
-    
-    setSchedules([...schedules, ...newSchedules]);
-    toast.success('Woche wurde kopiert');
-  };
+  const handleBulkApply = async () => {
+    const shiftsToCreate = activeStaff.flatMap((staff) =>
+      bulkDays.map((dayIndex) => ({
+        staff_member_id: staff.id,
+        day_of_week: dayIndex,
+        start_time: bulkStartTime,
+        end_time: bulkEndTime,
+        is_working: bulkIsWorking
+      }))
+    );
 
-  const handleBulkApply = () => {
-    const newSchedules: ShiftSchedule[] = [];
-    
-    activeStaff.forEach((staff) => {
-      bulkDays.forEach((dayIndex) => {
-        const date = weekDays[dayIndex];
-        const existingIndex = schedules.findIndex(
-          s => s.staffId === staff.id && isSameDay(s.date, date)
-        );
-        
-        const newSchedule: ShiftSchedule = {
-          staffId: staff.id,
-          date,
-          startTime: bulkStartTime,
-          endTime: bulkEndTime,
-          isWorking: bulkIsWorking
-        };
-        
-        if (existingIndex >= 0) {
-          // Will be updated later
-          newSchedules.push({ ...newSchedule, staffId: staff.id });
-        } else {
-          newSchedules.push(newSchedule);
-        }
-      });
-    });
-    
-    // Update existing and add new
-    const updatedSchedules = [...schedules];
-    newSchedules.forEach((newSched) => {
-      const existingIndex = updatedSchedules.findIndex(
-        s => s.staffId === newSched.staffId && isSameDay(s.date, newSched.date)
-      );
-      if (existingIndex >= 0) {
-        updatedSchedules[existingIndex] = newSched;
-      } else {
-        updatedSchedules.push(newSched);
-      }
-    });
-    
-    setSchedules(updatedSchedules);
+    await upsertBulkShifts.mutateAsync(shiftsToCreate);
     setIsBulkDialogOpen(false);
-    toast.success(`Zeiten auf ${activeStaff.length} Mitarbeiter angewendet`);
   };
 
   const toggleBulkDay = (dayIndex: number) => {
@@ -167,6 +88,7 @@ const Shifts = () => {
   };
 
   const activeStaff = staffMembers.filter(s => s.is_active);
+  const isLoading = staffLoading || shiftsLoading;
 
   if (isLoading) {
     return (
@@ -183,25 +105,11 @@ const Shifts = () => {
         <div>
           <h1 className="text-3xl font-bold text-foreground">Dienstplan</h1>
           <p className="text-muted-foreground mt-1">
-            Planen Sie die Arbeitszeiten Ihrer Mitarbeiter
+            Planen Sie die Standard-Arbeitszeiten Ihrer Mitarbeiter (wöchentlich wiederkehrend)
           </p>
         </div>
         
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="icon" onClick={handlePrevWeek}>
-            <ChevronLeft className="w-4 h-4" />
-          </Button>
-          <Button variant="outline" onClick={handleToday}>
-            Heute
-          </Button>
-          <Button variant="outline" size="icon" onClick={handleNextWeek}>
-            <ChevronRight className="w-4 h-4" />
-          </Button>
-          <Button variant="outline" className="gap-2 ml-4" onClick={handleCopyWeek}>
-            <Copy className="w-4 h-4" />
-            Woche kopieren
-          </Button>
-          
           <Dialog open={isBulkDialogOpen} onOpenChange={setIsBulkDialogOpen}>
             <DialogTrigger asChild>
               <Button className="gap-2">
@@ -272,21 +180,14 @@ const Shifts = () => {
                 <DialogClose asChild>
                   <Button variant="outline">Abbrechen</Button>
                 </DialogClose>
-                <Button onClick={handleBulkApply} className="gap-2" disabled={bulkDays.length === 0}>
-                  <Save className="w-4 h-4" />
+                <Button onClick={handleBulkApply} className="gap-2" disabled={bulkDays.length === 0 || isBulkUpserting}>
+                  {isBulkUpserting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                   Auf alle anwenden
                 </Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
         </div>
-      </div>
-
-      {/* Week Display */}
-      <div className="text-center">
-        <h2 className="text-lg font-semibold text-foreground">
-          {format(currentWeek, 'dd. MMMM', { locale: de })} - {format(addDays(currentWeek, 6), 'dd. MMMM yyyy', { locale: de })}
-        </h2>
       </div>
 
       {activeStaff.length === 0 ? (
@@ -326,10 +227,9 @@ const Shifts = () => {
                         <th className="p-4 text-left font-medium text-muted-foreground w-48">
                           Mitarbeiter
                         </th>
-                        {weekDays.map((day, i) => (
+                        {WEEKDAYS.map((day, i) => (
                           <th key={i} className="p-4 text-center font-medium text-muted-foreground min-w-[120px]">
-                            <div>{WEEKDAYS[i]}</div>
-                            <div className="text-sm">{format(day, 'dd.MM.', { locale: de })}</div>
+                            <div>{day}</div>
                           </th>
                         ))}
                       </tr>
@@ -348,8 +248,8 @@ const Shifts = () => {
                               <span className="font-medium">{staff.name}</span>
                             </div>
                           </td>
-                          {weekDays.map((day, dayIndex) => {
-                            const schedule = getScheduleForDay(staff.id, day);
+                          {WEEKDAYS.map((_, dayIndex) => {
+                            const shift = getShiftForStaffAndDay(staff.id, dayIndex);
                             return (
                               <td key={dayIndex} className="p-2 text-center">
                                 <Dialog>
@@ -358,24 +258,24 @@ const Shifts = () => {
                                       onClick={() => setEditingSchedule({
                                         staffId: staff.id,
                                         dayIndex,
-                                        startTime: schedule?.startTime || DEFAULT_START,
-                                        endTime: schedule?.endTime || DEFAULT_END,
-                                        isWorking: schedule?.isWorking ?? true
+                                        startTime: shift?.start_time?.slice(0, 5) || DEFAULT_START,
+                                        endTime: shift?.end_time?.slice(0, 5) || DEFAULT_END,
+                                        isWorking: shift?.is_working ?? true
                                       })}
                                       className={`w-full p-2 rounded-lg text-sm transition-all hover:ring-2 hover:ring-primary/50 ${
-                                        schedule?.isWorking
+                                        shift?.is_working
                                           ? 'bg-primary/10 text-primary'
-                                          : schedule
+                                          : shift
                                           ? 'bg-muted text-muted-foreground'
                                           : 'bg-muted/50 text-muted-foreground/50 border border-dashed'
                                       }`}
                                     >
-                                      {schedule?.isWorking ? (
+                                      {shift?.is_working ? (
                                         <div>
-                                          <div className="font-medium">{schedule.startTime}</div>
-                                          <div className="text-xs">{schedule.endTime}</div>
+                                          <div className="font-medium">{shift.start_time?.slice(0, 5)}</div>
+                                          <div className="text-xs">{shift.end_time?.slice(0, 5)}</div>
                                         </div>
-                                      ) : schedule ? (
+                                      ) : shift ? (
                                         <div className="text-xs">Frei</div>
                                       ) : (
                                         <div className="text-xs">+</div>
@@ -385,7 +285,7 @@ const Shifts = () => {
                                   <DialogContent>
                                     <DialogHeader>
                                       <DialogTitle>
-                                        {staff.name} - {WEEKDAYS[dayIndex]}, {format(day, 'dd.MM.yyyy')}
+                                        {staff.name} - {WEEKDAYS[dayIndex]}
                                       </DialogTitle>
                                     </DialogHeader>
                                     {editingSchedule && (
@@ -431,8 +331,8 @@ const Shifts = () => {
                                         <Button variant="outline">Abbrechen</Button>
                                       </DialogClose>
                                       <DialogClose asChild>
-                                        <Button onClick={handleSaveSchedule} className="gap-2">
-                                          <Save className="w-4 h-4" />
+                                        <Button onClick={handleSaveSchedule} className="gap-2" disabled={isUpserting}>
+                                          {isUpserting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                                           Speichern
                                         </Button>
                                       </DialogClose>
@@ -472,17 +372,14 @@ const Shifts = () => {
 
               {selectedStaff && (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                  {weekDays.map((day, dayIndex) => {
-                    const schedule = getScheduleForDay(selectedStaff, day);
+                  {WEEKDAYS.map((dayName, dayIndex) => {
+                    const shift = getShiftForStaffAndDay(selectedStaff, dayIndex);
                     const staff = activeStaff.find(s => s.id === selectedStaff);
                     
                     return (
                       <Card key={dayIndex}>
                         <CardHeader className="pb-2">
-                          <CardTitle className="text-base">{WEEKDAYS[dayIndex]}</CardTitle>
-                          <p className="text-sm text-muted-foreground">
-                            {format(day, 'dd. MMMM yyyy', { locale: de })}
-                          </p>
+                          <CardTitle className="text-base">{dayName}</CardTitle>
                         </CardHeader>
                         <CardContent>
                           <Dialog>
@@ -491,24 +388,24 @@ const Shifts = () => {
                                 onClick={() => setEditingSchedule({
                                   staffId: selectedStaff,
                                   dayIndex,
-                                  startTime: schedule?.startTime || DEFAULT_START,
-                                  endTime: schedule?.endTime || DEFAULT_END,
-                                  isWorking: schedule?.isWorking ?? true
+                                  startTime: shift?.start_time?.slice(0, 5) || DEFAULT_START,
+                                  endTime: shift?.end_time?.slice(0, 5) || DEFAULT_END,
+                                  isWorking: shift?.is_working ?? true
                                 })}
                                 className={`w-full p-4 rounded-lg text-center transition-all hover:ring-2 hover:ring-primary/50 ${
-                                  schedule?.isWorking
+                                  shift?.is_working
                                     ? 'bg-primary/10 text-primary'
-                                    : schedule
+                                    : shift
                                     ? 'bg-muted text-muted-foreground'
                                     : 'bg-muted/50 text-muted-foreground/50 border border-dashed'
                                 }`}
                               >
-                                {schedule?.isWorking ? (
+                                {shift?.is_working ? (
                                   <div>
                                     <Clock className="w-5 h-5 mx-auto mb-2" />
-                                    <div className="font-medium text-lg">{schedule.startTime} - {schedule.endTime}</div>
+                                    <div className="font-medium text-lg">{shift.start_time?.slice(0, 5)} - {shift.end_time?.slice(0, 5)}</div>
                                   </div>
-                                ) : schedule ? (
+                                ) : shift ? (
                                   <div className="py-2 text-muted-foreground">Frei</div>
                                 ) : (
                                   <div className="py-2 text-muted-foreground/50">Klicken zum Hinzufügen</div>
@@ -518,7 +415,7 @@ const Shifts = () => {
                             <DialogContent>
                               <DialogHeader>
                                 <DialogTitle>
-                                  {staff?.name} - {WEEKDAYS[dayIndex]}, {format(day, 'dd.MM.yyyy')}
+                                  {staff?.name} - {dayName}
                                 </DialogTitle>
                               </DialogHeader>
                               {editingSchedule && (
@@ -564,8 +461,8 @@ const Shifts = () => {
                                   <Button variant="outline">Abbrechen</Button>
                                 </DialogClose>
                                 <DialogClose asChild>
-                                  <Button onClick={handleSaveSchedule} className="gap-2">
-                                    <Save className="w-4 h-4" />
+                                  <Button onClick={handleSaveSchedule} className="gap-2" disabled={isUpserting}>
+                                    {isUpserting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                                     Speichern
                                   </Button>
                                 </DialogClose>
