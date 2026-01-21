@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
-import { Upload, Users, Loader2, Search, Download, FileSpreadsheet, CheckCircle, XCircle, Trash2, Phone, Mail, ChevronLeft, ChevronRight, Filter, CalendarIcon, X } from 'lucide-react';
+import { Upload, Users, Loader2, Search, Download, FileSpreadsheet, CheckCircle, XCircle, Trash2, Phone, Mail, ChevronLeft, ChevronRight, Filter, CalendarIcon, X, Link2, Eye } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
@@ -17,6 +17,7 @@ import { Progress } from '@/components/ui/progress';
 import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
+import ContactDetailDialog from '@/components/portal/ContactDetailDialog';
 
 interface Contact {
   id: string;
@@ -71,6 +72,11 @@ const Customers = () => {
   const [dateTo, setDateTo] = useState<Date | undefined>();
   const [bookingFilter, setBookingFilter] = useState('all');
   const [showFilters, setShowFilters] = useState(false);
+  
+  // Detail dialog
+  const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [linkingAll, setLinkingAll] = useState(false);
 
   // Debounce search
   useEffect(() => {
@@ -177,6 +183,29 @@ const Customers = () => {
   };
 
   const hasActiveFilters = debouncedSearch || dateFrom || dateTo || bookingFilter !== 'all';
+
+  const openContactDetail = (contact: Contact) => {
+    setSelectedContact(contact);
+    setDetailOpen(true);
+  };
+
+  const linkAllReservations = async () => {
+    if (!user?.id) return;
+    
+    setLinkingAll(true);
+    try {
+      const { data, error } = await supabase.rpc('link_reservations_to_contacts', {
+        p_user_id: user.id
+      });
+
+      if (error) throw error;
+      toast.success(`${data || 0} Reservierungen verknüpft`);
+    } catch (error: any) {
+      toast.error('Fehler: ' + error.message);
+    } finally {
+      setLinkingAll(false);
+    }
+  };
 
   const parseCSVLine = (line: string): string[] => {
     const result: string[] = [];
@@ -371,12 +400,25 @@ const Customers = () => {
             {totalCount > 0 ? `${totalCount.toLocaleString('de-DE')} Kontakte gespeichert` : 'Importieren Sie Ihre Kundendaten'}
           </p>
         </div>
-        {totalCount > 0 && (
-          <Button variant="destructive" size="sm" onClick={deleteAllContacts}>
-            <Trash2 className="w-4 h-4 mr-2" />
-            Alle löschen
-          </Button>
-        )}
+        <div className="flex gap-2">
+          {totalCount > 0 && (
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={linkAllReservations}
+              disabled={linkingAll}
+            >
+              {linkingAll ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Link2 className="w-4 h-4 mr-2" />}
+              Reservierungen verknüpfen
+            </Button>
+          )}
+          {totalCount > 0 && (
+            <Button variant="destructive" size="sm" onClick={deleteAllContacts}>
+              <Trash2 className="w-4 h-4 mr-2" />
+              Alle löschen
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Import Card */}
@@ -628,7 +670,11 @@ const Customers = () => {
               </TableHeader>
               <TableBody>
                 {contacts.map((contact) => (
-                  <TableRow key={contact.id}>
+                  <TableRow 
+                    key={contact.id} 
+                    className="cursor-pointer hover:bg-muted/50"
+                    onClick={() => openContactDetail(contact)}
+                  >
                     <TableCell>
                       <div>
                         <p className="font-medium">{contact.name}</p>
@@ -733,6 +779,14 @@ const Customers = () => {
           )}
         </CardContent>
       </Card>
+
+      {/* Contact Detail Dialog */}
+      <ContactDetailDialog
+        contact={selectedContact}
+        open={detailOpen}
+        onOpenChange={setDetailOpen}
+        onContactUpdated={fetchContacts}
+      />
     </motion.div>
   );
 };

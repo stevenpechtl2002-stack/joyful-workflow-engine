@@ -683,6 +683,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      link_reservations_to_contacts: {
+        Args: { p_user_id: string }
+        Returns: number
+      }
     }
     Enums: {
       app_role: "admin" | "manager" | "customer" | "sales"
