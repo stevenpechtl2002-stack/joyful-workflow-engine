@@ -20,16 +20,18 @@ import {
   MessageSquare,
   Bot,
   User,
-  UsersRound
+  UsersRound,
+  CheckCircle2
 } from 'lucide-react';
 import { useReservations } from '@/hooks/usePortalData';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isSameMonth, addMonths, subMonths, startOfWeek, endOfWeek, addDays, addWeeks, subWeeks } from 'date-fns';
 import { de } from 'date-fns/locale';
 import ReservationForm from '@/components/portal/ReservationForm';
 import { StaffCalendarView } from '@/components/portal/StaffCalendarView';
+import { AvailabilityView } from '@/components/portal/AvailabilityView';
 
 type ViewMode = 'month' | 'week' | 'day';
-type CalendarType = 'standard' | 'staff';
+type CalendarType = 'standard' | 'staff' | 'availability';
 
 const Calendar = () => {
   const [calendarType, setCalendarType] = useState<CalendarType>('standard');
@@ -130,7 +132,7 @@ const Calendar = () => {
         <div className="flex items-center gap-3">
           {/* Calendar Type Switcher */}
           <Tabs value={calendarType} onValueChange={(v) => setCalendarType(v as CalendarType)}>
-            <TabsList className="grid grid-cols-2">
+            <TabsList className="grid grid-cols-3">
               <TabsTrigger value="standard" className="gap-2">
                 <CalendarIcon className="w-4 h-4" />
                 <span className="hidden sm:inline">Standard</span>
@@ -138,6 +140,10 @@ const Calendar = () => {
               <TabsTrigger value="staff" className="gap-2">
                 <UsersRound className="w-4 h-4" />
                 <span className="hidden sm:inline">Mitarbeiter</span>
+              </TabsTrigger>
+              <TabsTrigger value="availability" className="gap-2">
+                <CheckCircle2 className="w-4 h-4" />
+                <span className="hidden sm:inline">Verfügbar</span>
               </TabsTrigger>
             </TabsList>
           </Tabs>
@@ -167,6 +173,14 @@ const Calendar = () => {
           transition={{ delay: 0.1 }}
         >
           <StaffCalendarView />
+        </motion.div>
+      ) : calendarType === 'availability' ? (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+        >
+          <AvailabilityView />
         </motion.div>
       ) : (
         <>

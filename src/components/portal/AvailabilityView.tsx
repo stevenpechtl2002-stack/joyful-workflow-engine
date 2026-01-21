@@ -1,0 +1,261 @@
+import { useState, useMemo } from 'react';
+import { motion } from 'framer-motion';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { 
+  ChevronLeft, 
+  ChevronRight, 
+  CalendarIcon,
+  Clock,
+  CheckCircle2,
+  XCircle
+} from 'lucide-react';
+import { useStaffMembers } from '@/hooks/useStaffMembers';
+import { useReservations } from '@/hooks/usePortalData';
+import { format, addDays, subDays, isSameDay } from 'date-fns';
+import { de } from 'date-fns/locale';
+
+interface TimeSlot {
+  time: string;
+  available: boolean;
+}
+
+export const AvailabilityView = () => {
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+  
+  const { staffMembers, isLoading: staffLoading } = useStaffMembers();
+  const { data: reservations, isLoading: reservationsLoading } = useReservations();
+
+  const activeStaff = useMemo(() => 
+    staffMembers?.filter(s => s.is_active) || [], 
+    [staffMembers]
+  );
+
+  // Business hours: 11:00 - 22:00, 30-minute slots
+  const timeSlots = useMemo(() => {
+    const slots: string[] = [];
+    for (let hour = 11; hour < 22; hour++) {
+      slots.push(`${hour.toString().padStart(2, '0')}:00`);
+      slots.push(`${hour.toString().padStart(2, '0')}:30`);
+    }
+    return slots;
+  }, []);
+
+  // Calculate availability per staff member
+  const availabilityMatrix = useMemo(() => {
+    if (!reservations || !activeStaff.length) return {};
+
+    const dateStr = format(selectedDate, 'yyyy-MM-dd');
+    const durationMinutes = 90;
+
+    const matrix: Record<string, TimeSlot[]> = {};
+
+    activeStaff.forEach(staff => {
+      const staffReservations = reservations.filter(res => 
+        res.reservation_date === dateStr && 
+        res.staff_member_id === staff.id &&
+        res.status !== 'cancelled'
+      );
+
+      matrix[staff.id] = timeSlots.map(slotTime => {
+        const slotStart = new Date(`${dateStr}T${slotTime}:00`);
+        const slotEnd = new Date(slotStart.getTime() + durationMinutes * 60000);
+
+        const hasConflict = staffReservations.some(res => {
+          const resStart = new Date(`${dateStr}T${res.reservation_time}`);
+          const resEnd = res.end_time 
+            ? new Date(`${dateStr}T${res.end_time}`)
+            : new Date(resStart.getTime() + durationMinutes * 60000);
+          return (slotStart < resEnd && slotEnd > resStart);
+        });
+
+        return {
+          time: slotTime,
+          available: !hasConflict
+        };
+      });
+    });
+
+    return matrix;
+  }, [reservations, activeStaff, selectedDate, timeSlots]);
+
+  // Count free slots per staff
+  const freeSlotCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    Object.entries(availabilityMatrix).forEach(([staffId, slots]) => {
+      counts[staffId] = slots.filter(s => s.available).length;
+    });
+    return counts;
+  }, [availabilityMatrix]);
+
+  const isLoading = staffLoading || reservationsLoading;
+
+  return (
+    <Card className="glass border-border/50">
+      <CardHeader className="pb-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <CardTitle className="text-xl flex items-center gap-2">
+            <CheckCircle2 className="w-5 h-5 text-green-500" />
+            Verfügbarkeit
+          </CardTitle>
+          
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="icon" onClick={() => setSelectedDate(subDays(selectedDate, 1))}>
+              <ChevronLeft className="w-5 h-5" />
+            </Button>
+            
+            <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className="min-w-[200px]">
+                  <CalendarIcon className="w-4 h-4 mr-2" />
+                  {format(selectedDate, 'EEEE, d. MMMM', { locale: de })}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="center">
+                <Calendar
+                  mode="single"
+                  selected={selectedDate}
+                  onSelect={(date) => {
+                    if (date) {
+                      setSelectedDate(date);
+                      setIsCalendarOpen(false);
+                    }
+                  }}
+                  locale={de}
+                />
+              </PopoverContent>
+            </Popover>
+            
+            <Button variant="ghost" size="icon" onClick={() => setSelectedDate(addDays(selectedDate, 1))}>
+              <ChevronRight className="w-5 h-5" />
+            </Button>
+            
+            {!isSameDay(selectedDate, new Date()) && (
+              <Button variant="outline" size="sm" onClick={() => setSelectedDate(new Date())}>
+                Heute
+              </Button>
+            )}
+          </div>
+        </div>
+        
+        <p className="text-sm text-muted-foreground mt-2">
+          Nur freie Zeitfenster pro Mitarbeiter – ideal für schnelle Verfügbarkeitsprüfung.
+        </p>
+      </CardHeader>
+      
+      <CardContent>
+        {isLoading ? (
+          <div className="space-y-4">
+            <Skeleton className="h-8 w-full" />
+            <Skeleton className="h-64 w-full" />
+          </div>
+        ) : activeStaff.length === 0 ? (
+          <div className="text-center py-12 text-muted-foreground">
+            <p>Keine aktiven Mitarbeiter vorhanden.</p>
+            <p className="text-sm mt-1">Fügen Sie Mitarbeiter im Mitarbeiter-Kalender hinzu.</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <div className="min-w-[600px]">
+              {/* Header with staff names */}
+              <div className="grid gap-2 mb-4" style={{ gridTemplateColumns: `80px repeat(${activeStaff.length}, 1fr)` }}>
+                <div className="text-sm font-medium text-muted-foreground flex items-center">
+                  <Clock className="w-4 h-4 mr-1" />
+                  Zeit
+                </div>
+                {activeStaff.map(staff => (
+                  <div key={staff.id} className="text-center">
+                    <div 
+                      className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium text-white"
+                      style={{ backgroundColor: staff.color }}
+                    >
+                      {staff.name}
+                    </div>
+                    <div className="text-xs text-muted-foreground mt-1">
+                      {freeSlotCounts[staff.id] || 0} frei
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Time slots grid - only show available */}
+              <div className="space-y-1">
+                {timeSlots.map(slotTime => {
+                  // Check if any staff has this slot available
+                  const anyAvailable = activeStaff.some(staff => 
+                    availabilityMatrix[staff.id]?.find(s => s.time === slotTime)?.available
+                  );
+
+                  if (!anyAvailable) return null;
+
+                  return (
+                    <motion.div 
+                      key={slotTime}
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      className="grid gap-2 items-center"
+                      style={{ gridTemplateColumns: `80px repeat(${activeStaff.length}, 1fr)` }}
+                    >
+                      <div className="text-sm font-medium text-muted-foreground">
+                        {slotTime}
+                      </div>
+                      {activeStaff.map(staff => {
+                        const slot = availabilityMatrix[staff.id]?.find(s => s.time === slotTime);
+                        const isAvailable = slot?.available || false;
+
+                        return (
+                          <div key={`${staff.id}-${slotTime}`} className="flex justify-center">
+                            {isAvailable ? (
+                              <Badge 
+                                variant="outline" 
+                                className="bg-green-500/10 text-green-600 border-green-500/30 hover:bg-green-500/20 cursor-default"
+                              >
+                                <CheckCircle2 className="w-3 h-3 mr-1" />
+                                Frei
+                              </Badge>
+                            ) : (
+                              <span className="text-muted-foreground/40">—</span>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </motion.div>
+                  );
+                })}
+              </div>
+
+              {/* Summary */}
+              <div className="mt-6 pt-4 border-t border-border/50">
+                <div className="flex flex-wrap gap-4 justify-center">
+                  {activeStaff.map(staff => {
+                    const freeCount = freeSlotCounts[staff.id] || 0;
+                    const totalSlots = timeSlots.length;
+                    const percentage = Math.round((freeCount / totalSlots) * 100);
+                    
+                    return (
+                      <div key={staff.id} className="flex items-center gap-2 text-sm">
+                        <div 
+                          className="w-3 h-3 rounded-full" 
+                          style={{ backgroundColor: staff.color }}
+                        />
+                        <span className="font-medium">{staff.name}:</span>
+                        <span className={freeCount > 0 ? 'text-green-600' : 'text-muted-foreground'}>
+                          {freeCount}/{totalSlots} frei ({percentage}%)
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+};
