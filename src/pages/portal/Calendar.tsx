@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
   ChevronLeft, 
   ChevronRight, 
@@ -18,16 +19,20 @@ import {
   Phone,
   MessageSquare,
   Bot,
-  User
+  User,
+  UsersRound
 } from 'lucide-react';
 import { useReservations } from '@/hooks/usePortalData';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isSameMonth, addMonths, subMonths, startOfWeek, endOfWeek, addDays, addWeeks, subWeeks } from 'date-fns';
 import { de } from 'date-fns/locale';
 import ReservationForm from '@/components/portal/ReservationForm';
+import { StaffCalendarView } from '@/components/portal/StaffCalendarView';
 
 type ViewMode = 'month' | 'week' | 'day';
+type CalendarType = 'standard' | 'staff';
 
 const Calendar = () => {
+  const [calendarType, setCalendarType] = useState<CalendarType>('standard');
   const [currentDate, setCurrentDate] = useState(new Date());
   const [viewMode, setViewMode] = useState<ViewMode>('month');
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
@@ -122,29 +127,56 @@ const Calendar = () => {
           </p>
         </div>
         
-        <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
-          <DialogTrigger asChild>
-            <Button className="bg-primary text-primary-foreground">
-              <Plus className="w-4 h-4 mr-2" />
-              Neue Reservierung
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-lg">
-            <DialogHeader>
-              <DialogTitle>Neue Reservierung</DialogTitle>
-            </DialogHeader>
-            <ReservationForm onSuccess={() => { setIsFormOpen(false); refetch(); }} />
-          </DialogContent>
-        </Dialog>
+        <div className="flex items-center gap-3">
+          {/* Calendar Type Switcher */}
+          <Tabs value={calendarType} onValueChange={(v) => setCalendarType(v as CalendarType)}>
+            <TabsList className="grid grid-cols-2">
+              <TabsTrigger value="standard" className="gap-2">
+                <CalendarIcon className="w-4 h-4" />
+                <span className="hidden sm:inline">Standard</span>
+              </TabsTrigger>
+              <TabsTrigger value="staff" className="gap-2">
+                <UsersRound className="w-4 h-4" />
+                <span className="hidden sm:inline">Mitarbeiter</span>
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+          
+          <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
+            <DialogTrigger asChild>
+              <Button className="bg-primary text-primary-foreground">
+                <Plus className="w-4 h-4 mr-2" />
+                Neue Reservierung
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-lg">
+              <DialogHeader>
+                <DialogTitle>Neue Reservierung</DialogTitle>
+              </DialogHeader>
+              <ReservationForm onSuccess={() => { setIsFormOpen(false); refetch(); }} />
+            </DialogContent>
+          </Dialog>
+        </div>
       </motion.div>
 
-      {/* Filters & Controls */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.1 }}
-        className="flex flex-col sm:flex-row gap-4"
-      >
+      {/* Staff Calendar View */}
+      {calendarType === 'staff' ? (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+        >
+          <StaffCalendarView />
+        </motion.div>
+      ) : (
+        <>
+          {/* Standard Calendar - Filters & Controls */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+            className="flex flex-col sm:flex-row gap-4"
+          >
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
@@ -378,6 +410,8 @@ const Calendar = () => {
           </CardContent>
         </Card>
       </motion.div>
+        </>
+      )}
     </div>
   );
 };

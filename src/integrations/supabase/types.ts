@@ -311,6 +311,7 @@ export type Database = {
           reservation_date: string
           reservation_time: string
           source: string
+          staff_member_id: string | null
           status: string
           updated_at: string
           user_id: string
@@ -327,6 +328,7 @@ export type Database = {
           reservation_date: string
           reservation_time: string
           source?: string
+          staff_member_id?: string | null
           status?: string
           updated_at?: string
           user_id: string
@@ -343,7 +345,52 @@ export type Database = {
           reservation_date?: string
           reservation_time?: string
           source?: string
+          staff_member_id?: string | null
           status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reservations_staff_member_id_fkey"
+            columns: ["staff_member_id"]
+            isOneToOne: false
+            referencedRelation: "staff_members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      staff_members: {
+        Row: {
+          avatar_url: string | null
+          color: string
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+          sort_order: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          color?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          sort_order?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          avatar_url?: string | null
+          color?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          sort_order?: number
           updated_at?: string
           user_id?: string
         }

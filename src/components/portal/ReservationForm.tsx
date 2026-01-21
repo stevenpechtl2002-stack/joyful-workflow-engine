@@ -16,20 +16,28 @@ import { toast } from 'sonner';
 
 interface ReservationFormProps {
   onSuccess: () => void;
+  defaultValues?: {
+    reservation_date?: string;
+    reservation_time?: string;
+    staff_member_id?: string;
+  };
 }
 
-const ReservationForm = ({ onSuccess }: ReservationFormProps) => {
+const ReservationForm = ({ onSuccess, defaultValues }: ReservationFormProps) => {
   const { user } = useAuth();
   const [submitting, setSubmitting] = useState(false);
-  const [date, setDate] = useState<Date>();
+  const [date, setDate] = useState<Date | undefined>(
+    defaultValues?.reservation_date ? new Date(defaultValues.reservation_date) : undefined
+  );
   
   const [formData, setFormData] = useState({
     customer_name: '',
     customer_phone: '',
     customer_email: '',
     party_size: 2,
-    reservation_time: '19:00',
+    reservation_time: defaultValues?.reservation_time || '19:00',
     notes: '',
+    staff_member_id: defaultValues?.staff_member_id || '',
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
