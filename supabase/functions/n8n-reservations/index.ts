@@ -1,4 +1,4 @@
-// Edge Function v2 - 2026-01-07
+// Edge Function v3 - 2026-01-21 - Staff Member Assignment Support
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0?target=deno";
 
@@ -74,13 +74,59 @@ serve(async (req: Request): Promise<Response> => {
     }
     console.log("Converted date:", reservationDate);
 
-    // Check for existing reservations at this time
-    const { data: existingReservations, error: checkError } = await supabase
+    // Look up staff member by name if provided
+    let staffMemberId: string | null = null;
+    let staffMemberName: string | null = null;
+    
+    if (payload.staff_member_name) {
+      const searchName = payload.staff_member_name.toLowerCase().trim();
+      console.log("Looking up staff member:", searchName);
+      
+      const { data: staffMembers, error: staffError } = await supabase
+        .from("staff_members")
+        .select("id, name")
+        .eq("user_id", customer.id)
+        .eq("is_active", true);
+
+      if (staffError) {
+        console.error("Error looking up staff member:", staffError);
+      } else if (staffMembers && staffMembers.length > 0) {
+        // Find staff member by exact match or partial match (case-insensitive)
+        const exactMatch = staffMembers.find(
+          s => s.name.toLowerCase() === searchName
+        );
+        const partialMatch = staffMembers.find(
+          s => s.name.toLowerCase().includes(searchName) || 
+               searchName.includes(s.name.toLowerCase())
+        );
+        
+        const matchedStaff = exactMatch || partialMatch;
+        
+        if (matchedStaff) {
+          staffMemberId = matchedStaff.id;
+          staffMemberName = matchedStaff.name;
+          console.log("Staff member found:", staffMemberName, staffMemberId);
+        } else {
+          console.log("No matching staff member found for:", searchName);
+          console.log("Available staff:", staffMembers.map(s => s.name).join(", "));
+        }
+      }
+    }
+
+    // Check for existing reservations at this time (optionally for specific staff member)
+    let reservationQuery = supabase
       .from("reservations")
-      .select("id, reservation_time, end_time")
+      .select("id, reservation_time, end_time, staff_member_id")
       .eq("user_id", customer.id)
       .eq("reservation_date", reservationDate)
       .neq("status", "cancelled");
+
+    // If staff member is specified, only check conflicts for that staff member
+    if (staffMemberId) {
+      reservationQuery = reservationQuery.eq("staff_member_id", staffMemberId);
+    }
+
+    const { data: existingReservations, error: checkError } = await reservationQuery;
 
     if (checkError) {
       console.error("Error checking existing reservations:", checkError);
@@ -89,7 +135,6 @@ serve(async (req: Request): Promise<Response> => {
 
     // Calculate end time (default 90 minutes if not provided)
     const requestedTime = payload.reservation_time;
-    const [reqHour, reqMin] = requestedTime.split(':').map(Number);
     const requestedStart = new Date(`${reservationDate}T${requestedTime}:00`);
     const durationMinutes = 90;
     const requestedEnd = new Date(requestedStart.getTime() + durationMinutes * 60000);
@@ -106,7 +151,7 @@ serve(async (req: Request): Promise<Response> => {
     });
 
     if (hasConflict) {
-      console.log("Time slot conflict detected for:", requestedTime);
+      console.log("Time slot conflict detected for:", requestedTime, staffMemberName ? `(${staffMemberName})` : "");
       
       // Find available alternative slots
       const businessHours = { start: 11, end: 22 };
@@ -136,10 +181,13 @@ serve(async (req: Request): Promise<Response> => {
         JSON.stringify({
           success: false,
           error: "TIME_SLOT_OCCUPIED",
-          message: `Der Termin um ${requestedTime} Uhr am ${payload.reservation_date} ist bereits belegt.`,
+          message: staffMemberName 
+            ? `${staffMemberName} hat um ${requestedTime} Uhr am ${payload.reservation_date} bereits einen Termin.`
+            : `Der Termin um ${requestedTime} Uhr am ${payload.reservation_date} ist bereits belegt.`,
+          staff_member: staffMemberName,
           alternative_slots: availableSlots,
           alternative_message: availableSlots.length > 0
-            ? `Verfügbare Zeiten: ${availableSlots.map(s => s + ' Uhr').join(', ')}`
+            ? `Verfügbare Zeiten${staffMemberName ? ` für ${staffMemberName}` : ''}: ${availableSlots.map(s => s + ' Uhr').join(', ')}`
             : 'An diesem Tag sind leider keine Termine mehr frei.'
         }),
         { status: 409, headers: { "Content-Type": "application/json", ...corsHeaders } }
@@ -161,7 +209,8 @@ serve(async (req: Request): Promise<Response> => {
         party_size: payload.party_size || 2,
         notes: payload.notes || null,
         source: payload.source || 'n8n',
-        status: 'pending'
+        status: 'pending',
+        staff_member_id: staffMemberId // NEW: Assign to staff member
       })
       .select()
       .single();
@@ -171,14 +220,16 @@ serve(async (req: Request): Promise<Response> => {
       throw reservationError;
     }
 
-    console.log("Reservation created successfully:", reservation.id);
+    console.log("Reservation created successfully:", reservation.id, staffMemberName ? `assigned to ${staffMemberName}` : "unassigned");
 
     await supabase
       .from("notifications")
       .insert({
         user_id: customer.id,
         title: "Neue Reservierung",
-        message: `${payload.customer_name} hat eine Reservierung für ${payload.party_size || 2} Personen am ${payload.reservation_date} um ${payload.reservation_time} Uhr angefragt.`,
+        message: staffMemberName
+          ? `${payload.customer_name} hat eine Reservierung für ${payload.party_size || 2} Personen am ${payload.reservation_date} um ${payload.reservation_time} Uhr bei ${staffMemberName} angefragt.`
+          : `${payload.customer_name} hat eine Reservierung für ${payload.party_size || 2} Personen am ${payload.reservation_date} um ${payload.reservation_time} Uhr angefragt.`,
         type: "info",
         link: "/portal/reservations"
       });
@@ -187,10 +238,14 @@ serve(async (req: Request): Promise<Response> => {
       JSON.stringify({ 
         success: true, 
         reservation_id: reservation.id,
-        message: "Reservierung erfolgreich erstellt",
+        message: staffMemberName
+          ? `Reservierung erfolgreich erstellt und ${staffMemberName} zugewiesen`
+          : "Reservierung erfolgreich erstellt",
         reservation_date: payload.reservation_date,
         reservation_time: payload.reservation_time,
-        end_time: endTimeString
+        end_time: endTimeString,
+        staff_member_id: staffMemberId,
+        staff_member_name: staffMemberName
       }),
       { status: 201, headers: { "Content-Type": "application/json", ...corsHeaders } }
     );
