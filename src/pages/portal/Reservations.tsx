@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -20,10 +20,15 @@ import {
   Bot,
   User,
   MoreHorizontal,
-  Trash2
+  Trash2,
+  Package,
+  Euro,
+  FileText
 } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useReservations } from '@/hooks/usePortalData';
+import { useStaffMembers } from '@/hooks/useStaffMembers';
+import { useProducts } from '@/hooks/useProducts';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -37,6 +42,12 @@ const Reservations = () => {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   
   const { data: reservations, isLoading, refetch } = useReservations({ status: statusFilter });
+  const { staffMembers } = useStaffMembers();
+  const { data: products } = useProducts();
+  
+  // Create lookup maps
+  const staffMap = new Map(staffMembers?.map(s => [s.id, s.name]) || []);
+  const productMap = new Map(products?.map(p => [p.id, { name: p.name, price: p.price }]) || []);
 
   const filteredReservations = reservations?.filter(res => {
     const matchesSearch = searchQuery === '' || 
@@ -110,6 +121,21 @@ const Reservations = () => {
         {labels[status] || status}
       </Badge>
     );
+  };
+
+  const getSourceLabel = (source: string) => {
+    const labels: Record<string, { label: string; icon: typeof Bot }> = {
+      voice_agent: { label: 'Voice Agent', icon: Bot },
+      n8n: { label: 'API/n8n', icon: Bot },
+      manual: { label: 'Manuell', icon: User },
+      api: { label: 'API', icon: Bot },
+    };
+    return labels[source] || { label: source, icon: User };
+  };
+
+  const formatCurrency = (value: number | null | undefined) => {
+    if (value == null) return '-';
+    return new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(value);
   };
 
   return (
@@ -220,98 +246,141 @@ const Reservations = () => {
                       <TableHead>Datum</TableHead>
                       <TableHead>Zeit</TableHead>
                       <TableHead>Kunde</TableHead>
-                      <TableHead>Personen</TableHead>
+                      <TableHead>Pers.</TableHead>
                       <TableHead>Telefon</TableHead>
+                      <TableHead>Mitarbeiter</TableHead>
+                      <TableHead>Produkt</TableHead>
+                      <TableHead>Anfrage</TableHead>
+                      <TableHead>Umsatz</TableHead>
                       <TableHead>Quelle</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead className="text-right">Aktionen</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredReservations.map((res) => (
-                      <TableRow key={res.id}>
-                        <TableCell>
-                          <Checkbox 
-                            checked={selectedIds.includes(res.id)}
-                            onCheckedChange={() => toggleSelect(res.id)}
-                          />
-                        </TableCell>
-                        <TableCell className="font-medium">
-                          {format(new Date(res.reservation_date), 'dd.MM.yyyy', { locale: de })}
-                        </TableCell>
-                        <TableCell>
-                          {res.reservation_time.slice(0, 5)}
-                        </TableCell>
-                        <TableCell>{res.customer_name}</TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-1">
-                            <Users className="w-3 h-3" />
-                            {res.party_size}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          {res.customer_phone ? (
-                            <a href={`tel:${res.customer_phone}`} className="flex items-center gap-1 hover:text-primary">
-                              <Phone className="w-3 h-3" />
-                              {res.customer_phone}
-                            </a>
-                          ) : '-'}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                            {res.source === 'voice_agent' ? (
-                              <>
-                                <Bot className="w-3 h-3" />
-                                Voice Agent
-                              </>
+                    {filteredReservations.map((res) => {
+                      const sourceInfo = getSourceLabel(res.source);
+                      const product = res.product_id ? productMap.get(res.product_id) : null;
+                      const staffName = res.staff_member_id ? staffMap.get(res.staff_member_id) : null;
+                      // Calculate revenue: price_paid × party_size
+                      const revenue = res.price_paid != null 
+                        ? Number(res.price_paid) * (res.party_size || 1)
+                        : (product ? Number(product.price) * (res.party_size || 1) : null);
+                      
+                      return (
+                        <TableRow key={res.id}>
+                          <TableCell>
+                            <Checkbox 
+                              checked={selectedIds.includes(res.id)}
+                              onCheckedChange={() => toggleSelect(res.id)}
+                            />
+                          </TableCell>
+                          <TableCell className="font-medium whitespace-nowrap">
+                            {format(new Date(res.reservation_date), 'dd.MM.yyyy', { locale: de })}
+                          </TableCell>
+                          <TableCell className="whitespace-nowrap">
+                            {res.reservation_time.slice(0, 5)}
+                            {res.end_time && ` - ${res.end_time.slice(0, 5)}`}
+                          </TableCell>
+                          <TableCell className="font-medium">{res.customer_name}</TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-1">
+                              <Users className="w-3 h-3 text-muted-foreground" />
+                              {res.party_size}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            {res.customer_phone ? (
+                              <a href={`tel:${res.customer_phone}`} className="flex items-center gap-1 hover:text-primary text-sm">
+                                <Phone className="w-3 h-3" />
+                                {res.customer_phone}
+                              </a>
+                            ) : '-'}
+                          </TableCell>
+                          <TableCell>
+                            {staffName ? (
+                              <span className="text-sm">{staffName}</span>
                             ) : (
-                              <>
-                                <User className="w-3 h-3" />
-                                Manuell
-                              </>
+                              <span className="text-muted-foreground text-sm">-</span>
                             )}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          {getStatusBadge(res.status)}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon">
-                                <MoreHorizontal className="w-4 h-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              {res.status === 'pending' && (
-                                <DropdownMenuItem onClick={() => updateStatus(res.id, 'confirmed')}>
-                                  <Check className="w-4 h-4 mr-2 text-green-500" />
-                                  Bestätigen
-                                </DropdownMenuItem>
-                              )}
-                              {res.status !== 'cancelled' && res.status !== 'completed' && (
-                                <DropdownMenuItem onClick={() => updateStatus(res.id, 'cancelled')}>
-                                  <X className="w-4 h-4 mr-2 text-red-500" />
-                                  Stornieren
-                                </DropdownMenuItem>
-                              )}
-                              {res.status === 'confirmed' && (
-                                <>
-                                  <DropdownMenuItem onClick={() => updateStatus(res.id, 'completed')}>
-                                    <Check className="w-4 h-4 mr-2 text-blue-500" />
-                                    Abschließen
+                          </TableCell>
+                          <TableCell>
+                            {product ? (
+                              <div className="flex items-center gap-1 text-sm">
+                                <Package className="w-3 h-3 text-muted-foreground" />
+                                {product.name}
+                              </div>
+                            ) : (
+                              <span className="text-muted-foreground text-sm">-</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {res.notes ? (
+                              <div className="flex items-center gap-1 text-sm max-w-[120px] truncate" title={res.notes}>
+                                <FileText className="w-3 h-3 text-muted-foreground flex-shrink-0" />
+                                <span className="truncate">{res.notes}</span>
+                              </div>
+                            ) : (
+                              <span className="text-muted-foreground text-sm">-</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {revenue != null ? (
+                              <div className="flex items-center gap-1 text-sm font-medium text-emerald-600">
+                                <Euro className="w-3 h-3" />
+                                {formatCurrency(revenue)}
+                              </div>
+                            ) : (
+                              <span className="text-muted-foreground text-sm">-</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                              <sourceInfo.icon className="w-3 h-3" />
+                              <span className="hidden sm:inline">{sourceInfo.label}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            {getStatusBadge(res.status)}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon">
+                                  <MoreHorizontal className="w-4 h-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                {res.status === 'pending' && (
+                                  <DropdownMenuItem onClick={() => updateStatus(res.id, 'confirmed')}>
+                                    <Check className="w-4 h-4 mr-2 text-green-500" />
+                                    Bestätigen
                                   </DropdownMenuItem>
-                                  <DropdownMenuItem onClick={() => updateStatus(res.id, 'no_show')}>
-                                    <X className="w-4 h-4 mr-2 text-gray-500" />
-                                    No-Show
+                                )}
+                                {res.status !== 'cancelled' && res.status !== 'completed' && (
+                                  <DropdownMenuItem onClick={() => updateStatus(res.id, 'cancelled')}>
+                                    <X className="w-4 h-4 mr-2 text-red-500" />
+                                    Stornieren
                                   </DropdownMenuItem>
-                                </>
-                              )}
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                                )}
+                                {res.status === 'confirmed' && (
+                                  <>
+                                    <DropdownMenuItem onClick={() => updateStatus(res.id, 'completed')}>
+                                      <Check className="w-4 h-4 mr-2 text-blue-500" />
+                                      Abschließen
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => updateStatus(res.id, 'no_show')}>
+                                      <X className="w-4 h-4 mr-2 text-gray-500" />
+                                      No-Show
+                                    </DropdownMenuItem>
+                                  </>
+                                )}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </div>

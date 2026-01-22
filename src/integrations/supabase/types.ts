@@ -177,6 +177,7 @@ export type Database = {
           api_key: string
           company_name: string | null
           created_at: string
+          dashboard_pin: string | null
           email: string
           id: string
           notes: string | null
@@ -189,6 +190,7 @@ export type Database = {
           api_key?: string
           company_name?: string | null
           created_at?: string
+          dashboard_pin?: string | null
           email: string
           id: string
           notes?: string | null
@@ -201,6 +203,7 @@ export type Database = {
           api_key?: string
           company_name?: string | null
           created_at?: string
+          dashboard_pin?: string | null
           email?: string
           id?: string
           notes?: string | null

@@ -18,7 +18,10 @@ import {
   Save,
   Lock,
   Shield,
-  Loader2
+  Loader2,
+  KeyRound,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 
 const Profile = () => {
@@ -26,6 +29,7 @@ const Profile = () => {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isSavingPin, setIsSavingPin] = useState(false);
   
   const [formData, setFormData] = useState({
     full_name: '',
@@ -39,6 +43,16 @@ const Profile = () => {
     confirmPassword: '',
   });
 
+  const [pinData, setPinData] = useState({
+    currentPin: '',
+    newPin: '',
+    confirmPin: '',
+    showCurrentPin: false,
+    showNewPin: false,
+  });
+  
+  const [hasExistingPin, setHasExistingPin] = useState(false);
+
   useEffect(() => {
     if (profile) {
       setFormData({
@@ -48,6 +62,26 @@ const Profile = () => {
       });
     }
   }, [profile]);
+
+  // Check if PIN is already set
+  useEffect(() => {
+    const checkPin = async () => {
+      if (!user?.id) return;
+      
+      const { data } = await supabase
+        .from('customers')
+        .select('*')
+        .eq('id', user.id)
+        .single();
+      
+      if (data) {
+        const customerData = data as typeof data & { dashboard_pin?: string | null };
+        setHasExistingPin(!!customerData.dashboard_pin);
+      }
+    };
+    
+    checkPin();
+  }, [user?.id]);
 
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -149,6 +183,92 @@ const Profile = () => {
       toast({
         title: 'Erfolgreich',
         description: 'Ihr Passwort wurde geändert.',
+      });
+    }
+  };
+
+  const handleSavePin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!user?.id) return;
+    
+    // Validation
+    if (hasExistingPin && !pinData.currentPin) {
+      toast({
+        title: 'Fehler',
+        description: 'Bitte geben Sie Ihren aktuellen PIN ein.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    
+    if (pinData.newPin && pinData.newPin !== pinData.confirmPin) {
+      toast({
+        title: 'Fehler',
+        description: 'Die neuen PINs stimmen nicht überein.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    
+    if (pinData.newPin && (pinData.newPin.length < 4 || pinData.newPin.length > 6)) {
+      toast({
+        title: 'Fehler',
+        description: 'Der PIN muss 4-6 Zeichen lang sein.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    
+    setIsSavingPin(true);
+    
+    // If changing existing PIN, verify current PIN first
+    if (hasExistingPin) {
+      const { data } = await supabase
+        .from('customers')
+        .select('*')
+        .eq('id', user.id)
+        .single();
+      
+      const customerData = data as typeof data & { dashboard_pin?: string | null };
+      
+      if (customerData?.dashboard_pin !== pinData.currentPin) {
+        setIsSavingPin(false);
+        toast({
+          title: 'Fehler',
+          description: 'Der aktuelle PIN ist nicht korrekt.',
+          variant: 'destructive',
+        });
+        return;
+      }
+    }
+    
+    // Update PIN (or remove if empty)
+    const { error } = await supabase
+      .from('customers')
+      .update({ dashboard_pin: pinData.newPin || null } as any)
+      .eq('id', user.id);
+    
+    setIsSavingPin(false);
+    
+    if (error) {
+      toast({
+        title: 'Fehler',
+        description: 'PIN konnte nicht gespeichert werden.',
+        variant: 'destructive',
+      });
+    } else {
+      setPinData({
+        currentPin: '',
+        newPin: '',
+        confirmPin: '',
+        showCurrentPin: false,
+        showNewPin: false,
+      });
+      setHasExistingPin(!!pinData.newPin);
+      toast({
+        title: 'Erfolgreich',
+        description: pinData.newPin ? 'PIN wurde gespeichert.' : 'PIN wurde entfernt.',
       });
     }
   };
@@ -358,6 +478,115 @@ const Profile = () => {
                       <Shield className="w-4 h-4 mr-2" />
                     )}
                     Passwort ändern
+                  </Button>
+                </div>
+              </form>
+            </CardContent>
+          </Card>
+        </motion.div>
+
+        {/* PIN Protection Card */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+        >
+          <Card className="glass border-border/50">
+            <CardHeader>
+              <CardTitle className="text-xl font-display flex items-center gap-2">
+                <KeyRound className="w-5 h-5 text-primary" />
+                Dashboard-PIN
+              </CardTitle>
+              <CardDescription>
+                Schützen Sie sensible Bereiche (Statistiken, Umsatz) mit einem PIN. 
+                Kalender und Reservierungen bleiben ohne PIN zugänglich.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleSavePin} className="space-y-4">
+                {hasExistingPin && (
+                  <div className="space-y-2">
+                    <Label htmlFor="currentPin">Aktueller PIN</Label>
+                    <div className="relative">
+                      <Input
+                        id="currentPin"
+                        type={pinData.showCurrentPin ? 'text' : 'password'}
+                        value={pinData.currentPin}
+                        onChange={(e) => setPinData({ ...pinData, currentPin: e.target.value })}
+                        className="bg-secondary/50 pr-10"
+                        placeholder="••••"
+                        maxLength={6}
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8"
+                        onClick={() => setPinData({ ...pinData, showCurrentPin: !pinData.showCurrentPin })}
+                      >
+                        {pinData.showCurrentPin ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="newPin">{hasExistingPin ? 'Neuer PIN' : 'PIN festlegen'}</Label>
+                    <div className="relative">
+                      <Input
+                        id="newPin"
+                        type={pinData.showNewPin ? 'text' : 'password'}
+                        value={pinData.newPin}
+                        onChange={(e) => setPinData({ ...pinData, newPin: e.target.value })}
+                        className="bg-secondary/50 pr-10"
+                        placeholder="4-6 Zeichen"
+                        maxLength={6}
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8"
+                        onClick={() => setPinData({ ...pinData, showNewPin: !pinData.showNewPin })}
+                      >
+                        {pinData.showNewPin ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="confirmPin">PIN bestätigen</Label>
+                    <Input
+                      id="confirmPin"
+                      type="password"
+                      value={pinData.confirmPin}
+                      onChange={(e) => setPinData({ ...pinData, confirmPin: e.target.value })}
+                      className="bg-secondary/50"
+                      placeholder="••••"
+                      maxLength={6}
+                    />
+                  </div>
+                </div>
+
+                {hasExistingPin && (
+                  <p className="text-sm text-muted-foreground">
+                    Lassen Sie das neue PIN-Feld leer, um den PIN-Schutz zu deaktivieren.
+                  </p>
+                )}
+
+                <div className="flex justify-end">
+                  <Button 
+                    type="submit" 
+                    variant="outline" 
+                    disabled={isSavingPin}
+                  >
+                    {isSavingPin ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <KeyRound className="w-4 h-4 mr-2" />
+                    )}
+                    {hasExistingPin ? 'PIN aktualisieren' : 'PIN aktivieren'}
                   </Button>
                 </div>
               </form>
