@@ -80,7 +80,8 @@ const Profile = () => {
   
   const [hasExistingPin, setHasExistingPin] = useState(false);
   const [protectedAreas, setProtectedAreas] = useState<string[]>([]);
-
+  const [savedProtectedAreas, setSavedProtectedAreas] = useState<string[]>([]);
+  const [isSavingAreas, setIsSavingAreas] = useState(false);
   useEffect(() => {
     if (profile) {
       setFormData({
@@ -95,13 +96,16 @@ const Profile = () => {
   useEffect(() => {
     const saved = localStorage.getItem('portal_protected_areas');
     if (saved) {
-      setProtectedAreas(JSON.parse(saved));
+      const parsed = JSON.parse(saved);
+      setProtectedAreas(parsed);
+      setSavedProtectedAreas(parsed);
     } else {
       // Default: protect all configurable areas
-      setProtectedAreas(CONFIGURABLE_AREAS.map(a => a.path));
+      const defaults = CONFIGURABLE_AREAS.map(a => a.path);
+      setProtectedAreas(defaults);
+      setSavedProtectedAreas(defaults);
     }
   }, []);
-
   // Check if PIN is already set
   useEffect(() => {
     const checkPin = async () => {
@@ -128,13 +132,26 @@ const Profile = () => {
       : [...protectedAreas, path];
     
     setProtectedAreas(updated);
-    localStorage.setItem('portal_protected_areas', JSON.stringify(updated));
-    
-    toast({
-      title: 'Gespeichert',
-      description: 'PIN-Schutz Einstellungen wurden aktualisiert.',
-    });
   };
+
+  const handleSaveProtectedAreas = () => {
+    setIsSavingAreas(true);
+    localStorage.setItem('portal_protected_areas', JSON.stringify(protectedAreas));
+    setSavedProtectedAreas(protectedAreas);
+    
+    // Trigger a page reload to apply changes to PortalLayout
+    setTimeout(() => {
+      setIsSavingAreas(false);
+      toast({
+        title: 'Gespeichert',
+        description: 'PIN-Schutz Einstellungen wurden aktualisiert.',
+      });
+      // Force PortalLayout to reload settings
+      window.dispatchEvent(new Event('storage'));
+    }, 300);
+  };
+
+  const hasUnsavedAreaChanges = JSON.stringify(protectedAreas.sort()) !== JSON.stringify(savedProtectedAreas.sort());
 
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -743,6 +760,21 @@ const Profile = () => {
                 <p>• Kalender, Reservierungen, Profil</p>
                 <p className="font-medium text-foreground mt-2">Immer geschützt (wenn PIN gesetzt):</p>
                 <p>• Dashboard, Analytics, Voice Agent, Dokumente, Support, API-Einstellungen</p>
+              </div>
+
+              <div className="flex justify-end mt-6">
+                <Button 
+                  onClick={handleSaveProtectedAreas}
+                  variant="hero"
+                  disabled={!hasUnsavedAreaChanges || isSavingAreas}
+                >
+                  {isSavingAreas ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <Save className="w-4 h-4 mr-2" />
+                  )}
+                  Einstellungen speichern
+                </Button>
               </div>
             </CardContent>
           </Card>

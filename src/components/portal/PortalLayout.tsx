@@ -46,15 +46,27 @@ const PortalLayout = () => {
     }
   }, [user, isLoading, navigate]);
 
-  // Load protected areas from localStorage
+  // Load protected areas from localStorage and listen for changes
   useEffect(() => {
-    const saved = localStorage.getItem('portal_protected_areas');
-    if (saved) {
-      setProtectedAreas(JSON.parse(saved));
-    } else {
-      // Default: protect all configurable areas
-      setProtectedAreas(CONFIGURABLE_PROTECTED_ROUTES);
-    }
+    const loadProtectedAreas = () => {
+      const saved = localStorage.getItem('portal_protected_areas');
+      if (saved) {
+        setProtectedAreas(JSON.parse(saved));
+      } else {
+        // Default: protect all configurable areas
+        setProtectedAreas(CONFIGURABLE_PROTECTED_ROUTES);
+      }
+    };
+
+    loadProtectedAreas();
+
+    // Listen for storage changes (from Profile page)
+    const handleStorageChange = () => {
+      loadProtectedAreas();
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
   }, []);
 
   const toggleTheme = () => {
