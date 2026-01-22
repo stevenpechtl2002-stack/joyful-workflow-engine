@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
+import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import { 
   User, 
@@ -21,8 +22,19 @@ import {
   Loader2,
   KeyRound,
   Eye,
-  EyeOff
+  EyeOff,
+  Settings2
 } from 'lucide-react';
+
+// Configurable protected routes
+const CONFIGURABLE_AREAS = [
+  { path: '/portal/products', label: 'Produkte' },
+  { path: '/portal/customers', label: 'Kunden' },
+  { path: '/portal/staff', label: 'Mitarbeiter' },
+  { path: '/portal/shifts', label: 'Dienstplan' },
+  { path: '/portal/subscriptions', label: 'Abonnement' },
+  { path: '/portal/notifications', label: 'Benachrichtigungen' },
+];
 
 const Profile = () => {
   const { user, profile, refreshProfile } = useAuth();
@@ -52,6 +64,7 @@ const Profile = () => {
   });
   
   const [hasExistingPin, setHasExistingPin] = useState(false);
+  const [protectedAreas, setProtectedAreas] = useState<string[]>([]);
 
   useEffect(() => {
     if (profile) {
@@ -62,6 +75,17 @@ const Profile = () => {
       });
     }
   }, [profile]);
+
+  // Load protected areas from localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem('portal_protected_areas');
+    if (saved) {
+      setProtectedAreas(JSON.parse(saved));
+    } else {
+      // Default: protect all configurable areas
+      setProtectedAreas(CONFIGURABLE_AREAS.map(a => a.path));
+    }
+  }, []);
 
   // Check if PIN is already set
   useEffect(() => {
@@ -82,6 +106,20 @@ const Profile = () => {
     
     checkPin();
   }, [user?.id]);
+
+  const toggleProtectedArea = (path: string) => {
+    const updated = protectedAreas.includes(path)
+      ? protectedAreas.filter(p => p !== path)
+      : [...protectedAreas, path];
+    
+    setProtectedAreas(updated);
+    localStorage.setItem('portal_protected_areas', JSON.stringify(updated));
+    
+    toast({
+      title: 'Gespeichert',
+      description: 'PIN-Schutz Einstellungen wurden aktualisiert.',
+    });
+  };
 
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -498,8 +536,8 @@ const Profile = () => {
                 Dashboard-PIN
               </CardTitle>
               <CardDescription>
-                Schützen Sie sensible Bereiche (Statistiken, Umsatz) mit einem PIN. 
-                Kalender und Reservierungen bleiben ohne PIN zugänglich.
+                Schützen Sie sensible Bereiche mit einem PIN. 
+                Kalender, Reservierungen und Profil bleiben immer frei zugänglich.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -590,6 +628,53 @@ const Profile = () => {
                   </Button>
                 </div>
               </form>
+            </CardContent>
+          </Card>
+        </motion.div>
+
+        {/* PIN Protected Areas Configuration */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4 }}
+        >
+          <Card className="glass border-border/50">
+            <CardHeader>
+              <CardTitle className="text-xl font-display flex items-center gap-2">
+                <Settings2 className="w-5 h-5 text-primary" />
+                Geschützte Bereiche
+              </CardTitle>
+              <CardDescription>
+                Wählen Sie, welche Bereiche zusätzlich mit PIN geschützt werden sollen.
+                Dashboard, Analytics, Voice Agent, Dokumente und Support sind immer geschützt.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {CONFIGURABLE_AREAS.map((area) => (
+                  <div key={area.path} className="flex items-center justify-between py-2">
+                    <div>
+                      <p className="font-medium text-foreground">{area.label}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {protectedAreas.includes(area.path) ? 'PIN erforderlich' : 'Frei zugänglich'}
+                      </p>
+                    </div>
+                    <Switch
+                      checked={protectedAreas.includes(area.path)}
+                      onCheckedChange={() => toggleProtectedArea(area.path)}
+                    />
+                  </div>
+                ))}
+              </div>
+              
+              <Separator className="my-4" />
+              
+              <div className="text-sm text-muted-foreground space-y-1">
+                <p className="font-medium text-foreground">Immer frei zugänglich:</p>
+                <p>• Kalender, Reservierungen, Profil</p>
+                <p className="font-medium text-foreground mt-2">Immer geschützt (wenn PIN gesetzt):</p>
+                <p>• Dashboard, Analytics, Voice Agent, Dokumente, Support, API-Einstellungen</p>
+              </div>
             </CardContent>
           </Card>
         </motion.div>

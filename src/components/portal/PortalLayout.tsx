@@ -6,10 +6,15 @@ import { Button } from '@/components/ui/button';
 import { Moon, Sun } from 'lucide-react';
 import { PinProtectionProvider, PinProtectedContent } from './PinProtection';
 
-// Routes that are freely accessible without PIN
+// Routes that are freely accessible without PIN (always)
 const FREE_ROUTES = [
   '/portal/calendar',
   '/portal/reservations',
+  '/portal/profile',
+];
+
+// Routes that can be optionally protected (configurable)
+const CONFIGURABLE_PROTECTED_ROUTES = [
   '/portal/products',
   '/portal/customers',
   '/portal/staff',
@@ -18,11 +23,22 @@ const FREE_ROUTES = [
   '/portal/notifications',
 ];
 
+// Routes that are always protected when PIN is set
+const ALWAYS_PROTECTED_ROUTES = [
+  '/portal', // Dashboard (exact match)
+  '/portal/analytics',
+  '/portal/voice-agent',
+  '/portal/documents',
+  '/portal/support',
+  '/portal/api-settings',
+];
+
 const PortalLayout = () => {
   const { user, isLoading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [isDark, setIsDark] = useState(true);
+  const [protectedAreas, setProtectedAreas] = useState<string[]>([]);
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -30,15 +46,41 @@ const PortalLayout = () => {
     }
   }, [user, isLoading, navigate]);
 
+  // Load protected areas from localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem('portal_protected_areas');
+    if (saved) {
+      setProtectedAreas(JSON.parse(saved));
+    } else {
+      // Default: protect all configurable areas
+      setProtectedAreas(CONFIGURABLE_PROTECTED_ROUTES);
+    }
+  }, []);
+
   const toggleTheme = () => {
     setIsDark(!isDark);
     document.documentElement.classList.toggle('light', !isDark);
   };
 
-  // Check if current route is free (no PIN required)
+  // Check if current route is protected
   const isRouteProtected = () => {
     const currentPath = location.pathname;
-    return !FREE_ROUTES.some(route => currentPath.startsWith(route));
+    
+    // Free routes are never protected
+    if (FREE_ROUTES.some(route => currentPath.startsWith(route))) {
+      return false;
+    }
+    
+    // Always protected routes
+    if (currentPath === '/portal') {
+      return true; // Dashboard exact match
+    }
+    if (ALWAYS_PROTECTED_ROUTES.some(route => route !== '/portal' && currentPath.startsWith(route))) {
+      return true;
+    }
+    
+    // Configurable protected routes
+    return protectedAreas.some(route => currentPath.startsWith(route));
   };
 
   if (isLoading) {
