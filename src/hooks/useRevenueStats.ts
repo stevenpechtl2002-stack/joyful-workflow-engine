@@ -13,6 +13,9 @@ interface RevenueStats {
   totalCustomers: number;
   newCustomersToday: number;
   reservationsWithRevenue: number;
+  totalReservationCount: number;
+  periodReservationCount: number;
+  todayReservationCount: number;
 }
 
 export const useRevenueStats = (dateRange: DateRange = 'month') => {
@@ -29,7 +32,10 @@ export const useRevenueStats = (dateRange: DateRange = 'month') => {
           todayCustomers: 0,
           totalCustomers: 0,
           newCustomersToday: 0,
-          reservationsWithRevenue: 0
+          reservationsWithRevenue: 0,
+          totalReservationCount: 0,
+          periodReservationCount: 0,
+          todayReservationCount: 0
         };
       }
       
@@ -69,13 +75,14 @@ export const useRevenueStats = (dateRange: DateRange = 'month') => {
         customer_email: string | null;
         price_paid: number | null;
         product_id: string | null;
+        party_size: number;
         status: string;
         created_at: string;
       }
       
       const { data: allReservations } = await supabase
         .from('reservations')
-        .select('id, reservation_date, customer_phone, customer_email, price_paid, product_id, status, created_at')
+        .select('id, reservation_date, customer_phone, customer_email, price_paid, product_id, party_size, status, created_at')
         .eq('user_id', user.id)
         .in('status', ['completed', 'confirmed']) as { data: ReservationWithProduct[] | null };
       
@@ -92,33 +99,47 @@ export const useRevenueStats = (dateRange: DateRange = 'month') => {
       let todayRevenue = 0;
       let periodRevenue = 0;
       let reservationsWithRevenue = 0;
+      let totalReservationCount = 0;
+      let periodReservationCount = 0;
+      let todayReservationCount = 0;
       
       const todayCustomerSet = new Set<string>();
       const allCustomerSet = new Set<string>();
       const newCustomersTodaySet = new Set<string>();
       
       allReservations?.forEach(r => {
-        // Get price: use price_paid if set, otherwise look up product price
-        const price = r.price_paid != null 
+        const partySize = r.party_size || 1;
+        
+        // Get price per person: use price_paid if set, otherwise look up product price
+        const pricePerPerson = r.price_paid != null 
           ? Number(r.price_paid) 
           : (r.product_id ? productPriceMap.get(r.product_id) || 0 : 0);
         
-        if (price > 0) {
-          totalRevenue += price;
-          reservationsWithRevenue++;
+        // Total revenue = price × party_size (for group bookings)
+        const totalPrice = pricePerPerson * partySize;
+        
+        if (totalPrice > 0) {
+          totalRevenue += totalPrice;
+          reservationsWithRevenue += partySize; // Count each person as a reservation
           
           // Period revenue
           if (r.reservation_date >= periodStart && r.reservation_date <= periodEnd) {
-            periodRevenue += price;
+            periodRevenue += totalPrice;
+            periodReservationCount += partySize;
           }
           
           // Today revenue
           if (r.reservation_date === todayStart) {
-            todayRevenue += price;
+            todayRevenue += totalPrice;
+            todayReservationCount += partySize;
           }
         }
         
+        // Total reservation count (by party_size)
+        totalReservationCount += partySize;
+        
         // Customer tracking (use phone or email as identifier)
+        // Count party_size as number of customers
         const customerKey = r.customer_phone || r.customer_email;
         if (customerKey) {
           allCustomerSet.add(customerKey);
@@ -150,7 +171,10 @@ export const useRevenueStats = (dateRange: DateRange = 'month') => {
         todayCustomers: todayCustomerSet.size,
         totalCustomers: totalContacts || allCustomerSet.size,
         newCustomersToday: newContactsToday || newCustomersTodaySet.size,
-        reservationsWithRevenue
+        reservationsWithRevenue,
+        totalReservationCount,
+        periodReservationCount,
+        todayReservationCount
       };
     },
     enabled: !!user?.id,
