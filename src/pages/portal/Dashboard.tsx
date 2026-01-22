@@ -123,6 +123,20 @@ const Dashboard = () => {
       bgColor: 'bg-primary/10',
     },
     { 
+      label: 'Buchungen ' + getDateRangeLabel(), 
+      value: revenueStats?.periodReservationCount ?? 0, 
+      icon: Calendar, 
+      color: 'text-orange-500',
+      bgColor: 'bg-orange-500/10',
+    },
+    { 
+      label: 'Buchungen heute', 
+      value: revenueStats?.todayReservationCount ?? 0, 
+      icon: CheckCircle2, 
+      color: 'text-lime-500',
+      bgColor: 'bg-lime-500/10',
+    },
+    { 
       label: 'Kunden heute', 
       value: revenueStats?.todayCustomers ?? 0, 
       icon: UserPlus, 
@@ -144,18 +158,18 @@ const Dashboard = () => {
       bgColor: 'bg-purple-500/10',
     },
     { 
-      label: 'Reservierungen gesamt', 
-      value: stats?.totalReservations ?? 0, 
+      label: 'Buchungen gesamt', 
+      value: revenueStats?.totalReservationCount ?? 0, 
       icon: Calendar, 
-      color: 'text-orange-500',
-      bgColor: 'bg-orange-500/10',
+      color: 'text-amber-500',
+      bgColor: 'bg-amber-500/10',
     },
     { 
       label: 'Anstehende Termine', 
       value: upcomingReservationsCount, 
       icon: Clock, 
-      color: 'text-amber-500',
-      bgColor: 'bg-amber-500/10',
+      color: 'text-rose-500',
+      bgColor: 'bg-rose-500/10',
     },
   ];
 
