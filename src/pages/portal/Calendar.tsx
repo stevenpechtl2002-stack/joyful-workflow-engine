@@ -344,7 +344,7 @@ const Calendar = () => {
                         });
                         
                         return (
-                          <div key={`${day.toISOString()}-${hour}`} className="border border-border/30 min-h-[40px] p-0.5">
+                          <div key={`${day.toISOString()}-${hour}`} className="border border-border-subtle min-h-[40px] p-0.5">
                             {hourReservations.map(res => (
                               <div
                                 key={res.id}
@@ -374,7 +374,7 @@ const Calendar = () => {
                       <div className="w-16 text-sm text-muted-foreground py-2">
                         {hour}:00
                       </div>
-                      <div className="flex-1 border-l border-border/30 pl-4 min-h-[60px] py-2">
+                      <div className="flex-1 border-l border-border-subtle pl-4 min-h-[60px] py-2">
                         {hourReservations.map(res => (
                           <Card key={res.id} className="mb-2 p-3 bg-secondary/30">
                             <div className="flex items-start justify-between">

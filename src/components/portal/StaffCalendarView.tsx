@@ -209,8 +209,8 @@ export const StaffCalendarView = () => {
   const renderDayView = () => (
     <div className="flex overflow-x-auto">
       {/* Time column */}
-      <div className="flex-shrink-0 w-16 border-r border-border/50">
-        <div className="h-12 border-b border-border/50" /> {/* Header spacer */}
+      <div className="flex-shrink-0 w-16 border-r border-border-subtle">
+        <div className="h-12 border-b border-border-subtle" /> {/* Header spacer */}
         <div className="relative" style={{ height: HOURS.length * HOUR_HEIGHT }}>
           {HOURS.map((hour) => (
             <div
@@ -225,8 +225,8 @@ export const StaffCalendarView = () => {
       </div>
 
       {/* Unassigned column */}
-      <div className="flex-shrink-0 w-32 border-r border-border/50 bg-muted/30">
-        <div className="h-12 border-b border-border/50 flex items-center justify-center">
+      <div className="flex-shrink-0 w-32 border-r border-border-subtle bg-muted/30">
+        <div className="h-12 border-b border-border-subtle flex items-center justify-center">
           <span className="text-xs font-medium text-muted-foreground">Nicht zugewiesen</span>
         </div>
         <div
@@ -235,12 +235,12 @@ export const StaffCalendarView = () => {
           onDragOver={handleDragOver}
           onDrop={(e) => handleDrop(e, '', currentDate)}
         >
-          {HOURS.map((hour) => (
-            <div
-              key={hour}
-              className="absolute w-full border-t border-border/20"
-              style={{ top: (hour - 9) * HOUR_HEIGHT, height: HOUR_HEIGHT }}
-            />
+            {HOURS.map((hour) => (
+              <div
+                key={hour}
+                className="absolute w-full border-t border-border-subtle"
+                style={{ top: (hour - 9) * HOUR_HEIGHT, height: HOUR_HEIGHT }}
+              />
           ))}
           {getUnassignedReservationsForDate(currentDate).map((res) => (
             <motion.div
@@ -266,9 +266,9 @@ export const StaffCalendarView = () => {
 
       {/* Staff columns */}
       {activeStaffMembers.map((staff: StaffMember) => (
-        <div key={staff.id} className="flex-shrink-0 w-40 border-r border-border/30">
+        <div key={staff.id} className="flex-shrink-0 w-40 border-r border-border-subtle/50">
           {/* Staff header */}
-          <div className="h-12 border-b border-border/50 flex items-center justify-center gap-2 px-2">
+          <div className="h-12 border-b border-border-subtle flex items-center justify-center gap-2 px-2">
             <Avatar className="h-7 w-7">
               <AvatarFallback style={{ backgroundColor: staff.color, color: 'white', fontSize: '10px' }}>
                 {getInitials(staff.name)}
@@ -288,7 +288,7 @@ export const StaffCalendarView = () => {
             {HOURS.map((hour) => (
               <div
                 key={hour}
-                className="absolute w-full border-t border-border/20 hover:bg-primary/5 cursor-pointer transition-colors"
+                className="absolute w-full border-t border-border-subtle hover:bg-primary/5 cursor-pointer transition-colors"
                 style={{ top: (hour - 9) * HOUR_HEIGHT, height: HOUR_HEIGHT }}
                 onClick={() => handleSlotClick(currentDate, hour, staff.id)}
               />
@@ -348,7 +348,7 @@ export const StaffCalendarView = () => {
           </div>
           <div className="flex overflow-x-auto">
             {/* Time column */}
-            <div className="flex-shrink-0 w-14 border-r border-border/50">
+            <div className="flex-shrink-0 w-14 border-r border-border-subtle">
               <div className="relative" style={{ height: HOURS.length * (HOUR_HEIGHT / 2) }}>
                 {HOURS.filter((_, i) => i % 2 === 0).map((hour) => (
                   <div
@@ -364,7 +364,7 @@ export const StaffCalendarView = () => {
 
             {/* Staff columns */}
             {activeStaffMembers.map((staff: StaffMember) => (
-              <div key={staff.id} className="flex-shrink-0 w-32 border-r border-border/30">
+              <div key={staff.id} className="flex-shrink-0 w-32 border-r border-border-subtle/50">
                 <div
                   className="relative"
                   style={{ height: HOURS.length * (HOUR_HEIGHT / 2) }}
