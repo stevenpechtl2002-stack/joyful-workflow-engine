@@ -1,9 +1,9 @@
-import { useState, useEffect, createContext, useContext, ReactNode } from 'react';
+import { useState, useEffect, createContext, useContext, ReactNode, useCallback, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Lock, Eye, EyeOff } from 'lucide-react';
+import { Lock, Eye, EyeOff, Timer } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
@@ -14,6 +14,8 @@ interface PinContextType {
   verifyPin: () => void;
   resetPinSession: () => void;
   isLoading: boolean;
+  inactivityTimeout: number;
+  setInactivityTimeout: (minutes: number) => void;
 }
 
 const PinContext = createContext<PinContextType>({
@@ -22,6 +24,8 @@ const PinContext = createContext<PinContextType>({
   verifyPin: () => {},
   resetPinSession: () => {},
   isLoading: true,
+  inactivityTimeout: 1,
+  setInactivityTimeout: () => {},
 });
 
 export const usePinProtection = () => useContext(PinContext);
@@ -35,6 +39,68 @@ export const PinProtectionProvider = ({ children }: { children: ReactNode }) => 
   const [showPin, setShowPin] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isVerifying, setIsVerifying] = useState(false);
+  const [inactivityTimeout, setInactivityTimeoutState] = useState(1); // minutes
+  const inactivityTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const lastActivityRef = useRef<number>(Date.now());
+
+  // Load timeout setting from localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem('portal_inactivity_timeout');
+    if (saved) {
+      setInactivityTimeoutState(parseInt(saved, 10));
+    }
+  }, []);
+
+  const setInactivityTimeout = (minutes: number) => {
+    setInactivityTimeoutState(minutes);
+    localStorage.setItem('portal_inactivity_timeout', minutes.toString());
+  };
+
+  // Reset inactivity timer
+  const resetInactivityTimer = useCallback(() => {
+    lastActivityRef.current = Date.now();
+    
+    if (inactivityTimerRef.current) {
+      clearTimeout(inactivityTimerRef.current);
+    }
+    
+    // Only set timer if PIN is verified and PIN is set
+    if (isPinVerified && hasPinSet && inactivityTimeout > 0) {
+      inactivityTimerRef.current = setTimeout(() => {
+        setIsPinVerified(false);
+        toast.info('Automatisch gesperrt wegen Inaktivität', {
+          icon: <Timer className="w-4 h-4" />,
+        });
+      }, inactivityTimeout * 60 * 1000);
+    }
+  }, [isPinVerified, hasPinSet, inactivityTimeout]);
+
+  // Set up activity listeners
+  useEffect(() => {
+    if (!hasPinSet || !isPinVerified) return;
+
+    const events = ['mousedown', 'mousemove', 'keydown', 'scroll', 'touchstart', 'click'];
+    
+    const handleActivity = () => {
+      resetInactivityTimer();
+    };
+
+    events.forEach(event => {
+      document.addEventListener(event, handleActivity, { passive: true });
+    });
+
+    // Start initial timer
+    resetInactivityTimer();
+
+    return () => {
+      events.forEach(event => {
+        document.removeEventListener(event, handleActivity);
+      });
+      if (inactivityTimerRef.current) {
+        clearTimeout(inactivityTimerRef.current);
+      }
+    };
+  }, [hasPinSet, isPinVerified, resetInactivityTimer]);
 
   useEffect(() => {
     const checkPin = async () => {
@@ -94,6 +160,7 @@ export const PinProtectionProvider = ({ children }: { children: ReactNode }) => 
       setShowPinDialog(false);
       setPin('');
       toast.success('PIN bestätigt');
+      resetInactivityTimer();
     } else {
       toast.error('Falscher PIN');
     }
@@ -101,10 +168,21 @@ export const PinProtectionProvider = ({ children }: { children: ReactNode }) => 
 
   const resetPinSession = () => {
     setIsPinVerified(false);
+    if (inactivityTimerRef.current) {
+      clearTimeout(inactivityTimerRef.current);
+    }
   };
 
   return (
-    <PinContext.Provider value={{ isPinVerified, hasPinSet, verifyPin, resetPinSession, isLoading }}>
+    <PinContext.Provider value={{ 
+      isPinVerified, 
+      hasPinSet, 
+      verifyPin, 
+      resetPinSession, 
+      isLoading,
+      inactivityTimeout,
+      setInactivityTimeout
+    }}>
       {children}
       
       <Dialog open={showPinDialog} onOpenChange={setShowPinDialog}>

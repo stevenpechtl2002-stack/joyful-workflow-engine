@@ -9,7 +9,9 @@ import { Label } from '@/components/ui/label';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
 import { Switch } from '@/components/ui/switch';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
+import { usePinProtection } from '@/components/portal/PinProtection';
 import { 
   User, 
   Mail, 
@@ -23,7 +25,8 @@ import {
   KeyRound,
   Eye,
   EyeOff,
-  Settings2
+  Settings2,
+  Timer
 } from 'lucide-react';
 
 // Configurable protected routes
@@ -36,9 +39,21 @@ const CONFIGURABLE_AREAS = [
   { path: '/portal/notifications', label: 'Benachrichtigungen' },
 ];
 
+// Inactivity timeout options (in minutes)
+const TIMEOUT_OPTIONS = [
+  { value: 1, label: '1 Minute' },
+  { value: 2, label: '2 Minuten' },
+  { value: 5, label: '5 Minuten' },
+  { value: 10, label: '10 Minuten' },
+  { value: 15, label: '15 Minuten' },
+  { value: 30, label: '30 Minuten' },
+  { value: 0, label: 'Deaktiviert' },
+];
+
 const Profile = () => {
   const { user, profile, refreshProfile } = useAuth();
   const { toast } = useToast();
+  const { inactivityTimeout, setInactivityTimeout } = usePinProtection();
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isSavingPin, setIsSavingPin] = useState(false);
@@ -628,6 +643,60 @@ const Profile = () => {
                   </Button>
                 </div>
               </form>
+            </CardContent>
+          </Card>
+        </motion.div>
+
+        {/* Auto-Lock Timeout Configuration */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.35 }}
+        >
+          <Card className="glass border-border/50">
+            <CardHeader>
+              <CardTitle className="text-xl font-display flex items-center gap-2">
+                <Timer className="w-5 h-5 text-primary" />
+                Automatische Sperre
+              </CardTitle>
+              <CardDescription>
+                Das Dashboard wird nach Inaktivität automatisch gesperrt und erfordert erneute PIN-Eingabe.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-medium text-foreground">Inaktivitäts-Timeout</p>
+                    <p className="text-sm text-muted-foreground">
+                      Zeit bis zur automatischen Sperre
+                    </p>
+                  </div>
+                  <Select
+                    value={inactivityTimeout.toString()}
+                    onValueChange={(value) => {
+                      setInactivityTimeout(parseInt(value, 10));
+                      toast({
+                        title: 'Gespeichert',
+                        description: value === '0' 
+                          ? 'Automatische Sperre deaktiviert.'
+                          : `Automatische Sperre nach ${TIMEOUT_OPTIONS.find(o => o.value === parseInt(value))?.label}.`,
+                      });
+                    }}
+                  >
+                    <SelectTrigger className="w-40">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {TIMEOUT_OPTIONS.map((option) => (
+                        <SelectItem key={option.value} value={option.value.toString()}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
             </CardContent>
           </Card>
         </motion.div>
