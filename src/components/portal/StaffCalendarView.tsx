@@ -5,13 +5,14 @@ import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { ChevronLeft, ChevronRight, Plus, User, Phone, Mail, Clock, Calendar, Users, FileText, Pencil } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, User, Phone, Mail, Clock, Calendar, Users, FileText, Pencil, Sparkles } from 'lucide-react';
 import { format, addDays, subDays, startOfWeek, endOfWeek, eachDayOfInterval, isSameDay } from 'date-fns';
 import { de } from 'date-fns/locale';
 import { useStaffMembers, useUpdateReservationStaff, StaffMember } from '@/hooks/useStaffMembers';
 import { useReservations } from '@/hooks/usePortalData';
 import { StaffManagementDialog } from './StaffManagementDialog';
 import ReservationForm from './ReservationForm';
+import { SmartTextImport } from './SmartTextImport';
 
 type StaffViewMode = 'day' | 'week';
 
@@ -49,6 +50,8 @@ export const StaffCalendarView = () => {
   const [selectedReservation, setSelectedReservation] = useState<Reservation | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
+  const [isSmartImportOpen, setIsSmartImportOpen] = useState(false);
+  const [smartImportStaffId, setSmartImportStaffId] = useState<string | undefined>();
 
   const { staffMembers } = useStaffMembers();
   const activeStaffMembers = staffMembers.filter(s => s.is_active);
@@ -131,7 +134,28 @@ export const StaffCalendarView = () => {
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
+    // Check if it's a text drop (smart import) vs reservation drag
+    const hasText = e.dataTransfer.types.includes('text/plain') && !draggedReservation;
+    e.dataTransfer.dropEffect = hasText ? 'copy' : 'move';
+  };
+
+  const handleTextDrop = (e: React.DragEvent, staffId: string, date: Date) => {
+    const text = e.dataTransfer.getData('text/plain');
+    // Only open smart import if it's actual text content (not a reservation drag)
+    if (text && text.length > 2 && !draggedReservation) {
+      e.preventDefault();
+      e.stopPropagation();
+      setSmartImportStaffId(staffId || undefined);
+      setIsSmartImportOpen(true);
+      // Store text for the dialog (we'll use a ref or state)
+      setTimeout(() => {
+        const textarea = document.querySelector('[data-smart-import-textarea]') as HTMLTextAreaElement;
+        if (textarea) {
+          textarea.value = text;
+          textarea.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+      }, 100);
+    }
   };
 
   const handleDrop = (e: React.DragEvent, staffId: string, date: Date) => {
@@ -446,6 +470,17 @@ export const StaffCalendarView = () => {
               Wochenansicht
             </Button>
           </div>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => {
+              setSmartImportStaffId(undefined);
+              setIsSmartImportOpen(true);
+            }}
+          >
+            <Sparkles className="w-4 h-4 mr-2" />
+            Text Import
+          </Button>
           <StaffManagementDialog />
         </div>
       </div>
@@ -650,6 +685,17 @@ export const StaffCalendarView = () => {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Smart Text Import Dialog */}
+      <SmartTextImport
+        isOpen={isSmartImportOpen}
+        onClose={() => setIsSmartImportOpen(false)}
+        onSuccess={() => {
+          refetch();
+        }}
+        defaultDate={currentDate}
+        defaultStaffId={smartImportStaffId}
+      />
     </div>
   );
 };
