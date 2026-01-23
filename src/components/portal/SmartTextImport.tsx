@@ -17,6 +17,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useStaffMembers } from '@/hooks/useStaffMembers';
+import { useProducts, Product } from '@/hooks/useProducts';
 
 interface ParsedReservation {
   customer_name: string;
@@ -27,6 +28,8 @@ interface ParsedReservation {
   party_size: number;
   notes?: string;
   staff_member_id?: string;
+  product_id?: string;
+  price_paid?: number;
   confidence: 'high' | 'medium' | 'low';
 }
 
@@ -73,6 +76,7 @@ export const SmartTextImport = ({ isOpen, onClose, onSuccess, defaultDate, defau
   const { user } = useAuth();
   const { staffMembers } = useStaffMembers();
   const activeStaff = staffMembers.filter(s => s.is_active);
+  const { data: products = [] } = useProducts(true);
 
   // Edit form state
   const [editName, setEditName] = useState('');
@@ -83,6 +87,31 @@ export const SmartTextImport = ({ isOpen, onClose, onSuccess, defaultDate, defau
   const [editPartySize, setEditPartySize] = useState(1);
   const [editNotes, setEditNotes] = useState('');
   const [editStaffId, setEditStaffId] = useState<string>('');
+  const [editProductId, setEditProductId] = useState<string>('');
+  const [editPrice, setEditPrice] = useState<string>('');
+
+  // Find product by matching text
+  const findMatchingProduct = useCallback((text: string): Product | undefined => {
+    const lowerText = text.toLowerCase();
+    
+    // Try exact match first
+    let match = products.find(p => lowerText.includes(p.name.toLowerCase()));
+    if (match) return match;
+    
+    // Try partial matches with common service keywords
+    const serviceKeywords = ['maniküre', 'pediküre', 'massage', 'facial', 'behandlung', 
+      'nägel', 'gel', 'lack', 'shellac', 'waxing', 'headspa', 'head spa',
+      'haare', 'schnitt', 'färben', 'strähnen', 'balayage', 'waschen'];
+    
+    for (const keyword of serviceKeywords) {
+      if (lowerText.includes(keyword)) {
+        match = products.find(p => p.name.toLowerCase().includes(keyword));
+        if (match) return match;
+      }
+    }
+    
+    return undefined;
+  }, [products]);
 
   const parseText = useCallback((text: string): ParsedReservation | null => {
     if (!text.trim()) return null;
@@ -219,11 +248,26 @@ export const SmartTextImport = ({ isOpen, onClose, onSuccess, defaultDate, defau
       }
     }
 
-    // Extract notes/service
+    // Extract notes/service and try to match product
     const serviceRegex = /(?:service|behandlung|dienstleistung|termin für|für)[:\s]+(.+?)(?:\.|$)/i;
     const serviceMatch = text.match(serviceRegex);
     if (serviceMatch) {
       notes = serviceMatch[1].trim();
+    }
+
+    // Try to find matching product from the text
+    const matchedProduct = findMatchingProduct(text);
+    let product_id: string | undefined;
+    let price_paid: number | undefined;
+    
+    if (matchedProduct) {
+      product_id = matchedProduct.id;
+      price_paid = matchedProduct.price;
+      matchedFields++;
+      // Use product name as notes if no explicit notes
+      if (!notes) {
+        notes = matchedProduct.name;
+      }
     }
 
     // Calculate confidence
@@ -242,9 +286,11 @@ export const SmartTextImport = ({ isOpen, onClose, onSuccess, defaultDate, defau
       party_size,
       notes,
       staff_member_id: defaultStaffId,
+      product_id,
+      price_paid,
       confidence
     };
-  }, [defaultDate, defaultStaffId]);
+  }, [defaultDate, defaultStaffId, findMatchingProduct]);
 
   const handleTextChange = (text: string) => {
     setRawText(text);
@@ -259,6 +305,18 @@ export const SmartTextImport = ({ isOpen, onClose, onSuccess, defaultDate, defau
       setEditPartySize(parsed.party_size);
       setEditNotes(parsed.notes || '');
       setEditStaffId(parsed.staff_member_id || defaultStaffId || '');
+      setEditProductId(parsed.product_id || '');
+      setEditPrice(parsed.price_paid?.toString() || '');
+    }
+  };
+
+  const handleProductChange = (productId: string) => {
+    setEditProductId(productId);
+    if (productId && productId !== 'none') {
+      const product = products.find(p => p.id === productId);
+      if (product) {
+        setEditPrice(product.price.toString());
+      }
     }
   };
 
@@ -294,6 +352,7 @@ export const SmartTextImport = ({ isOpen, onClose, onSuccess, defaultDate, defau
 
     setIsSaving(true);
     try {
+      const priceValue = editPrice ? parseFloat(editPrice) : null;
       const { error } = await supabase.from('reservations').insert({
         user_id: user.id,
         customer_name: editName,
@@ -304,6 +363,8 @@ export const SmartTextImport = ({ isOpen, onClose, onSuccess, defaultDate, defau
         party_size: editPartySize,
         notes: editNotes || null,
         staff_member_id: editStaffId || null,
+        product_id: editProductId || null,
+        price_paid: priceValue,
         status: 'confirmed',
         source: 'manual'
       });
@@ -476,8 +537,35 @@ Maniküre + Pediküre`}
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="space-y-2 col-span-2">
-                    <Label>Notizen / Service</Label>
+                  <div className="space-y-2">
+                    <Label>Produkt / Service</Label>
+                    <Select value={editProductId || "none"} onValueChange={(val) => handleProductChange(val === "none" ? "" : val)}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Kein Produkt" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Kein Produkt</SelectItem>
+                        {products.map(product => (
+                          <SelectItem key={product.id} value={product.id}>
+                            {product.name} - {product.price.toFixed(2)} €
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Preis (€)</Label>
+                    <Input 
+                      type="number" 
+                      step="0.01"
+                      min={0} 
+                      value={editPrice} 
+                      onChange={(e) => setEditPrice(e.target.value)}
+                      placeholder="0.00"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Notizen</Label>
                     <Input value={editNotes} onChange={(e) => setEditNotes(e.target.value)} />
                   </div>
                 </div>
@@ -509,6 +597,20 @@ Maniküre + Pediküre`}
                     <span className="text-muted-foreground">Personen:</span>
                     <span className="font-medium">{parsedData.party_size}</span>
                   </div>
+                  {parsedData.product_id && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Produkt:</span>
+                      <span className="font-medium text-primary">
+                        {products.find(p => p.id === parsedData.product_id)?.name || '-'}
+                      </span>
+                    </div>
+                  )}
+                  {parsedData.price_paid && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Preis:</span>
+                      <span className="font-medium text-primary">{parsedData.price_paid.toFixed(2)} €</span>
+                    </div>
+                  )}
                   {parsedData.notes && (
                     <div className="flex justify-between col-span-2">
                       <span className="text-muted-foreground">Notizen:</span>
