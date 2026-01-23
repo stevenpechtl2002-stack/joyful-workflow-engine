@@ -136,46 +136,57 @@ export const SmartTextImport = ({ isOpen, onClose, onSuccess, defaultDate, defau
       matchedFields++;
     }
 
-    // Extract date
-    // Format: DD.MM.YYYY or DD.MM.YY or DD.MM
-    const dateRegex1 = /(\d{1,2})\.(\d{1,2})\.?(\d{2,4})?/;
+    // Extract date - PRIORITIZE explicit date formats over relative references
+    let explicitDateFound = false;
+    
+    // Format: DD.MM.YYYY or DD.MM.YY or DD.MM (explicit date has highest priority)
+    const dateRegex1 = /(\d{1,2})\.(\d{1,2})\.(\d{2,4})/;
     const dateMatch1 = text.match(dateRegex1);
     if (dateMatch1) {
       const day = parseInt(dateMatch1[1]);
       const month = parseInt(dateMatch1[2]) - 1;
-      let year = dateMatch1[3] ? parseInt(dateMatch1[3]) : new Date().getFullYear();
+      let year = parseInt(dateMatch1[3]);
       if (year < 100) year += 2000;
       
       const parsedDate = new Date(year, month, day);
-      if (isValid(parsedDate) && day <= 31 && month <= 11) {
+      if (isValid(parsedDate) && day >= 1 && day <= 31 && month >= 0 && month <= 11) {
         reservation_date = format(parsedDate, 'yyyy-MM-dd');
         matchedFields++;
+        explicitDateFound = true;
       }
     }
 
-    // Check for weekday references
-    for (const [weekday, dayNum] of Object.entries(WEEKDAY_MAP)) {
-      if (fullText.includes(weekday)) {
-        const today = new Date();
-        const currentDay = today.getDay();
-        let daysToAdd = dayNum - currentDay;
-        if (daysToAdd <= 0) daysToAdd += 7;
-        reservation_date = format(addDays(today, daysToAdd), 'yyyy-MM-dd');
+    // Only use relative references if no explicit date was found
+    if (!explicitDateFound) {
+      // Check for relative date references first (most specific)
+      if (fullText.includes('heute')) {
+        reservation_date = format(new Date(), 'yyyy-MM-dd');
         matchedFields++;
-        break;
+        explicitDateFound = true;
+      } else if (fullText.includes('übermorgen')) {
+        reservation_date = format(addDays(new Date(), 2), 'yyyy-MM-dd');
+        matchedFields++;
+        explicitDateFound = true;
+      } else if (fullText.includes('morgen')) {
+        reservation_date = format(addDays(new Date(), 1), 'yyyy-MM-dd');
+        matchedFields++;
+        explicitDateFound = true;
       }
     }
 
-    // Check for relative date references
-    if (fullText.includes('heute')) {
-      reservation_date = format(new Date(), 'yyyy-MM-dd');
-      matchedFields++;
-    } else if (fullText.includes('morgen')) {
-      reservation_date = format(addDays(new Date(), 1), 'yyyy-MM-dd');
-      matchedFields++;
-    } else if (fullText.includes('übermorgen')) {
-      reservation_date = format(addDays(new Date(), 2), 'yyyy-MM-dd');
-      matchedFields++;
+    // Only use weekday references if still no date found
+    if (!explicitDateFound) {
+      for (const [weekday, dayNum] of Object.entries(WEEKDAY_MAP)) {
+        if (fullText.includes(weekday)) {
+          const today = new Date();
+          const currentDay = today.getDay();
+          let daysToAdd = dayNum - currentDay;
+          if (daysToAdd <= 0) daysToAdd += 7;
+          reservation_date = format(addDays(today, daysToAdd), 'yyyy-MM-dd');
+          matchedFields++;
+          break;
+        }
+      }
     }
 
     // Extract name - try different patterns
