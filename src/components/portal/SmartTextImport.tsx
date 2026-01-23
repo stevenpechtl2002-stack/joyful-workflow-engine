@@ -90,6 +90,38 @@ export const SmartTextImport = ({ isOpen, onClose, onSuccess, defaultDate, defau
   const [editProductId, setEditProductId] = useState<string>('');
   const [editPrice, setEditPrice] = useState<string>('');
 
+  // Find staff member by matching name in text
+  const findMatchingStaff = useCallback((text: string): string | undefined => {
+    const lowerText = text.toLowerCase();
+    
+    // Look for staff names after keywords like "Teammitglied", "Mitarbeiter", "bei"
+    const staffKeywords = ['teammitglied', 'mitarbeiter', 'bei', 'mit', 'stylist', 'therapeut'];
+    
+    for (const staff of activeStaff) {
+      const staffNameLower = staff.name.toLowerCase();
+      
+      // Check if staff name appears after a keyword
+      for (const keyword of staffKeywords) {
+        const keywordIndex = lowerText.indexOf(keyword);
+        if (keywordIndex !== -1) {
+          // Check if staff name appears after the keyword (within 50 chars)
+          const afterKeyword = lowerText.slice(keywordIndex, keywordIndex + 50);
+          if (afterKeyword.includes(staffNameLower)) {
+            return staff.id;
+          }
+        }
+      }
+      
+      // Direct name match (case insensitive, whole word)
+      const nameRegex = new RegExp(`\\b${staffNameLower}\\b`, 'i');
+      if (nameRegex.test(text)) {
+        return staff.id;
+      }
+    }
+    
+    return undefined;
+  }, [activeStaff]);
+
   // Find product by matching text
   const findMatchingProduct = useCallback((text: string): Product | undefined => {
     const lowerText = text.toLowerCase();
@@ -101,7 +133,7 @@ export const SmartTextImport = ({ isOpen, onClose, onSuccess, defaultDate, defau
     // Try partial matches with common service keywords
     const serviceKeywords = ['maniküre', 'pediküre', 'massage', 'facial', 'behandlung', 
       'nägel', 'gel', 'lack', 'shellac', 'waxing', 'headspa', 'head spa',
-      'haare', 'schnitt', 'färben', 'strähnen', 'balayage', 'waschen'];
+      'haare', 'schnitt', 'färben', 'strähnen', 'balayage', 'waschen', 'spa', 'luxus'];
     
     for (const keyword of serviceKeywords) {
       if (lowerText.includes(keyword)) {
@@ -270,6 +302,14 @@ export const SmartTextImport = ({ isOpen, onClose, onSuccess, defaultDate, defau
       }
     }
 
+    // Try to find matching staff member from the text
+    const matchedStaffId = findMatchingStaff(text);
+    let staff_member_id = defaultStaffId;
+    if (matchedStaffId) {
+      staff_member_id = matchedStaffId;
+      matchedFields++;
+    }
+
     // Calculate confidence
     if (matchedFields >= 4) {
       confidence = 'high';
@@ -285,12 +325,12 @@ export const SmartTextImport = ({ isOpen, onClose, onSuccess, defaultDate, defau
       reservation_time,
       party_size,
       notes,
-      staff_member_id: defaultStaffId,
+      staff_member_id,
       product_id,
       price_paid,
       confidence
     };
-  }, [defaultDate, defaultStaffId, findMatchingProduct]);
+  }, [defaultDate, defaultStaffId, findMatchingProduct, findMatchingStaff]);
 
   const handleTextChange = (text: string) => {
     setRawText(text);
