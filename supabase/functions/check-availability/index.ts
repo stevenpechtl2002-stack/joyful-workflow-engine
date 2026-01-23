@@ -39,16 +39,30 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Get customer by API key
+    // Get customer by API key from customer_api_keys table
+    const { data: apiKeyRecord, error: apiKeyError } = await supabase
+      .from("customer_api_keys")
+      .select("customer_id")
+      .eq("api_key", apiKey)
+      .single();
+
+    if (apiKeyError || !apiKeyRecord) {
+      return new Response(
+        JSON.stringify({ error: "Invalid API key", availability: false, alternatives: [] }),
+        { status: 401, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+
+    // Get customer and verify status
     const { data: customer, error: customerError } = await supabase
       .from("customers")
       .select("id, status")
-      .eq("api_key", apiKey)
+      .eq("id", apiKeyRecord.customer_id)
       .single();
 
     if (customerError || !customer) {
       return new Response(
-        JSON.stringify({ error: "Invalid API key", availability: false, alternatives: [] }),
+        JSON.stringify({ error: "Customer not found", availability: false, alternatives: [] }),
         { status: 401, headers: { "Content-Type": "application/json", ...corsHeaders } }
       );
     }

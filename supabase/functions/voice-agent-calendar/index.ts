@@ -34,21 +34,37 @@ serve(async (req) => {
 
     console.log('Voice Agent Calendar Request:', { action, date, time });
 
-    // Authenticate via API key from customers table
+    // Authenticate via API key from customer_api_keys table
     let userId = payload.user_id;
     
     if (payload.api_key && !userId) {
-      const { data: customer, error: authError } = await supabase
-        .from('customers')
-        .select('id')
+      // First find the customer_id from the api_key
+      const { data: apiKeyRecord, error: apiKeyError } = await supabase
+        .from('customer_api_keys')
+        .select('customer_id')
         .eq('api_key', payload.api_key)
+        .single();
+
+      if (apiKeyError || !apiKeyRecord) {
+        console.error('API key not found:', apiKeyError);
+        return new Response(
+          JSON.stringify({ success: false, error: 'Ungültiger API-Schlüssel' }),
+          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // Verify customer is active
+      const { data: customer, error: customerError } = await supabase
+        .from('customers')
+        .select('id, status')
+        .eq('id', apiKeyRecord.customer_id)
         .eq('status', 'active')
         .single();
 
-      if (authError || !customer) {
-        console.error('Auth error:', authError);
+      if (customerError || !customer) {
+        console.error('Customer not found or inactive:', customerError);
         return new Response(
-          JSON.stringify({ success: false, error: 'Ungültiger API-Schlüssel' }),
+          JSON.stringify({ success: false, error: 'Kunde nicht gefunden oder inaktiv' }),
           { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }

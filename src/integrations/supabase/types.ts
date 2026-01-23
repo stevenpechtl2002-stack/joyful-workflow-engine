@@ -172,9 +172,47 @@ export type Database = {
         }
         Relationships: []
       }
-      customers: {
+      customer_api_keys: {
         Row: {
           api_key: string
+          created_at: string
+          customer_id: string
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          api_key?: string
+          created_at?: string
+          customer_id: string
+          id?: string
+          updated_at?: string
+        }
+        Update: {
+          api_key?: string
+          created_at?: string
+          customer_id?: string
+          id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_api_keys_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: true
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_api_keys_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: true
+            referencedRelation: "customers_sales_view"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      customers: {
+        Row: {
           company_name: string | null
           created_at: string
           dashboard_pin: string | null
@@ -187,7 +225,6 @@ export type Database = {
           updated_at: string
         }
         Insert: {
-          api_key?: string
           company_name?: string | null
           created_at?: string
           dashboard_pin?: string | null
@@ -200,7 +237,6 @@ export type Database = {
           updated_at?: string
         }
         Update: {
-          api_key?: string
           company_name?: string | null
           created_at?: string
           dashboard_pin?: string | null

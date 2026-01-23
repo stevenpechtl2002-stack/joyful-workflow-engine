@@ -27,19 +27,34 @@ const ApiSettings = () => {
   const queryClient = useQueryClient();
   const [showApiKey, setShowApiKey] = useState(false);
 
-  // Fetch customer data with API key
+  // Fetch customer data and API key from separate tables
   const { data: customer, isLoading } = useQuery({
     queryKey: ['customer-api-key', user?.id],
     queryFn: async () => {
       if (!user?.id) return null;
-      const { data, error } = await supabase
+      
+      // Fetch customer status and plan
+      const { data: customerData, error: customerError } = await supabase
         .from('customers')
-        .select('api_key, status, plan')
+        .select('status, plan')
         .eq('id', user.id)
         .single();
       
-      if (error) throw error;
-      return data;
+      if (customerError) throw customerError;
+
+      // Fetch API key from separate secure table
+      const { data: apiKeyData, error: apiKeyError } = await supabase
+        .from('customer_api_keys')
+        .select('api_key')
+        .eq('customer_id', user.id)
+        .single();
+      
+      // API key might not exist yet
+      return {
+        status: customerData.status,
+        plan: customerData.plan,
+        api_key: apiKeyData?.api_key || null
+      };
     },
     enabled: !!user?.id,
   });
@@ -49,15 +64,37 @@ const ApiSettings = () => {
     mutationFn: async () => {
       if (!user?.id) throw new Error('Not authenticated');
       
-      const { data, error } = await supabase
-        .from('customers')
-        .update({ api_key: crypto.randomUUID() })
-        .eq('id', user.id)
-        .select('api_key')
-        .single();
+      const newApiKey = crypto.randomUUID();
       
-      if (error) throw error;
-      return data;
+      // Try to update existing API key record
+      const { data: existingKey } = await supabase
+        .from('customer_api_keys')
+        .select('id')
+        .eq('customer_id', user.id)
+        .single();
+
+      if (existingKey) {
+        // Update existing record
+        const { data, error } = await supabase
+          .from('customer_api_keys')
+          .update({ api_key: newApiKey })
+          .eq('customer_id', user.id)
+          .select('api_key')
+          .single();
+        
+        if (error) throw error;
+        return data;
+      } else {
+        // Insert new record if doesn't exist
+        const { data, error } = await supabase
+          .from('customer_api_keys')
+          .insert({ customer_id: user.id, api_key: newApiKey })
+          .select('api_key')
+          .single();
+        
+        if (error) throw error;
+        return data;
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['customer-api-key'] });

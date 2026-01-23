@@ -27,7 +27,10 @@ interface Customer {
   created_at: string;
   notes: string | null;
   sales_rep_id: string | null;
-  api_key: string;
+}
+
+interface CustomerWithApiKey extends Customer {
+  api_key?: string;
 }
 
 interface CallLog {
@@ -95,7 +98,7 @@ const AdminDashboard = () => {
   const { user, roles, signOut, isLoading } = useAuth();
   const { toast } = useToast();
   
-  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [customers, setCustomers] = useState<CustomerWithApiKey[]>([]);
   const [callLogs, setCallLogs] = useState<CallLog[]>([]);
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [voiceAgentConfigs, setVoiceAgentConfigs] = useState<VoiceAgentConfig[]>([]);
@@ -146,14 +149,25 @@ const AdminDashboard = () => {
   const fetchAllData = async () => {
     setDataLoading(true);
     try {
-      const [customersRes, callLogsRes, reservationsRes, voiceAgentRes] = await Promise.all([
+      const [customersRes, apiKeysRes, callLogsRes, reservationsRes, voiceAgentRes] = await Promise.all([
         supabase.from('customers').select('*').order('created_at', { ascending: false }),
+        supabase.from('customer_api_keys').select('customer_id, api_key'),
         supabase.from('call_logs').select('*').order('started_at', { ascending: false }).limit(100),
         supabase.from('reservations').select('*').order('reservation_date', { ascending: false }).limit(100),
         supabase.from('voice_agent_config').select('*').order('updated_at', { ascending: false }),
       ]);
 
-      if (customersRes.data) setCustomers(customersRes.data);
+      // Merge API keys with customers
+      if (customersRes.data) {
+        const apiKeyMap = new Map(
+          (apiKeysRes.data || []).map(k => [k.customer_id, k.api_key])
+        );
+        const customersWithKeys: CustomerWithApiKey[] = customersRes.data.map(c => ({
+          ...c,
+          api_key: apiKeyMap.get(c.id)
+        }));
+        setCustomers(customersWithKeys);
+      }
       if (callLogsRes.data) setCallLogs(callLogsRes.data);
       if (reservationsRes.data) setReservations(reservationsRes.data);
       if (voiceAgentRes.data) setVoiceAgentConfigs(voiceAgentRes.data);

@@ -747,16 +747,30 @@ serve(async (req: Request): Promise<Response> => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Authenticate customer
+    // Authenticate customer via customer_api_keys table
+    const { data: apiKeyRecord, error: apiKeyError } = await supabase
+      .from("customer_api_keys")
+      .select("customer_id")
+      .eq("api_key", apiKey)
+      .single();
+
+    if (apiKeyError || !apiKeyRecord) {
+      return new Response(
+        JSON.stringify({ error: "Invalid API key", code: "INVALID_API_KEY" }),
+        { status: 401, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+
+    // Get customer details
     const { data: customer, error: customerError } = await supabase
       .from("customers")
       .select("id, email, status, plan")
-      .eq("api_key", apiKey)
+      .eq("id", apiKeyRecord.customer_id)
       .single();
 
     if (customerError || !customer) {
       return new Response(
-        JSON.stringify({ error: "Invalid API key", code: "INVALID_API_KEY" }),
+        JSON.stringify({ error: "Customer not found", code: "CUSTOMER_NOT_FOUND" }),
         { status: 401, headers: { "Content-Type": "application/json", ...corsHeaders } }
       );
     }
