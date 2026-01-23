@@ -607,7 +607,7 @@ async function handleBooking(
     .insert({
       user_id: customer.id,
       customer_name: payload.customer_name,
-      customer_phone: payload.customer_phone || null,
+      customer_phone: payload.customer_phone || payload.phone || null,
       customer_email: payload.customer_email || null,
       reservation_date: date,
       reservation_time: time,
