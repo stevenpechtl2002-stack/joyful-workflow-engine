@@ -32,8 +32,13 @@ interface Reservation {
   price_paid?: number | null;
 }
 
-const HOURS = Array.from({ length: 14 }, (_, i) => i + 9); // 09:00 - 22:00
-const HOUR_HEIGHT = 60; // px per hour
+// 30-Minuten-Intervalle von 09:00 - 22:00
+const TIME_SLOTS = Array.from({ length: 26 }, (_, i) => {
+  const hour = Math.floor(i / 2) + 9;
+  const minutes = (i % 2) * 30;
+  return { hour, minutes, label: `${hour.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}` };
+});
+const SLOT_HEIGHT = 30; // px per 30-min slot
 
 export const StaffCalendarView = () => {
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -102,7 +107,8 @@ export const StaffCalendarView = () => {
   const calculateBlockPosition = (time: string) => {
     const [hours, minutes] = time.split(':').map(Number);
     const startHour = 9;
-    return ((hours - startHour) * HOUR_HEIGHT) + (minutes / 60) * HOUR_HEIGHT;
+    const totalMinutesFromStart = (hours - startHour) * 60 + minutes;
+    return (totalMinutesFromStart / 30) * SLOT_HEIGHT;
   };
 
   const calculateBlockHeight = (startTime: string, endTime: string | null) => {
@@ -115,7 +121,7 @@ export const StaffCalendarView = () => {
     }
     
     const durationMinutes = (endH * 60 + endM) - (startH * 60 + startM);
-    return Math.max(30, (durationMinutes / 60) * HOUR_HEIGHT);
+    return Math.max(SLOT_HEIGHT, (durationMinutes / 30) * SLOT_HEIGHT);
   };
 
   const handleDragStart = (e: React.DragEvent, reservationId: string) => {
@@ -156,8 +162,8 @@ export const StaffCalendarView = () => {
     setDraggedReservation(null);
   };
 
-  const handleSlotClick = (date: Date, hour: number, staffId: string) => {
-    const time = `${hour.toString().padStart(2, '0')}:00`;
+  const handleSlotClick = (date: Date, hour: number, minutes: number, staffId: string) => {
+    const time = `${hour.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
     setSelectedSlot({ date, time, staffId });
     setIsFormOpen(true);
   };
@@ -214,14 +220,14 @@ export const StaffCalendarView = () => {
       {/* Time column */}
       <div className="flex-shrink-0 w-16 border-r border-border-subtle">
         <div className="h-12 border-b border-border-subtle" /> {/* Header spacer */}
-        <div className="relative" style={{ height: HOURS.length * HOUR_HEIGHT }}>
-          {HOURS.map((hour) => (
+        <div className="relative" style={{ height: TIME_SLOTS.length * SLOT_HEIGHT }}>
+          {TIME_SLOTS.map((slot, idx) => (
             <div
-              key={hour}
+              key={slot.label}
               className="absolute w-full text-xs text-muted-foreground pr-2 text-right"
-              style={{ top: (hour - 9) * HOUR_HEIGHT - 6 }}
+              style={{ top: idx * SLOT_HEIGHT - 6 }}
             >
-              {hour}:00
+              {slot.label}
             </div>
           ))}
         </div>
@@ -234,16 +240,16 @@ export const StaffCalendarView = () => {
         </div>
         <div
           className="relative"
-          style={{ height: HOURS.length * HOUR_HEIGHT }}
+          style={{ height: TIME_SLOTS.length * SLOT_HEIGHT }}
           onDragOver={handleDragOver}
           onDrop={(e) => handleDrop(e, '', currentDate)}
         >
-            {HOURS.map((hour) => (
-              <div
-                key={hour}
-                className="absolute w-full border-t border-border-subtle"
-                style={{ top: (hour - 9) * HOUR_HEIGHT, height: HOUR_HEIGHT }}
-              />
+          {TIME_SLOTS.map((slot, idx) => (
+            <div
+              key={slot.label}
+              className={`absolute w-full border-t ${slot.minutes === 0 ? 'border-border-subtle' : 'border-border-subtle/30'}`}
+              style={{ top: idx * SLOT_HEIGHT, height: SLOT_HEIGHT }}
+            />
           ))}
           {getUnassignedReservationsForDate(currentDate).map((res) => (
             <motion.div
@@ -283,17 +289,17 @@ export const StaffCalendarView = () => {
           {/* Time slots */}
           <div
             className="relative"
-            style={{ height: HOURS.length * HOUR_HEIGHT }}
+            style={{ height: TIME_SLOTS.length * SLOT_HEIGHT }}
             onDragOver={handleDragOver}
             onDrop={(e) => handleDrop(e, staff.id, currentDate)}
           >
-            {/* Hour lines */}
-            {HOURS.map((hour) => (
+            {/* 30-min slot lines */}
+            {TIME_SLOTS.map((slot, idx) => (
               <div
-                key={hour}
-                className="absolute w-full border-t border-border-subtle hover:bg-primary/5 cursor-pointer transition-colors"
-                style={{ top: (hour - 9) * HOUR_HEIGHT, height: HOUR_HEIGHT }}
-                onClick={() => handleSlotClick(currentDate, hour, staff.id)}
+                key={slot.label}
+                className={`absolute w-full border-t ${slot.minutes === 0 ? 'border-border-subtle' : 'border-border-subtle/30'} hover:bg-primary/5 cursor-pointer transition-colors`}
+                style={{ top: idx * SLOT_HEIGHT, height: SLOT_HEIGHT }}
+                onClick={() => handleSlotClick(currentDate, slot.hour, slot.minutes, staff.id)}
               />
             ))}
 
@@ -352,14 +358,14 @@ export const StaffCalendarView = () => {
           <div className="flex overflow-x-auto">
             {/* Time column */}
             <div className="flex-shrink-0 w-14 border-r border-border-subtle">
-              <div className="relative" style={{ height: HOURS.length * (HOUR_HEIGHT / 2) }}>
-                {HOURS.filter((_, i) => i % 2 === 0).map((hour) => (
+              <div className="relative" style={{ height: TIME_SLOTS.length * (SLOT_HEIGHT / 2) }}>
+                {TIME_SLOTS.filter((_, i) => i % 2 === 0).map((slot, idx) => (
                   <div
-                    key={hour}
+                    key={slot.label}
                     className="absolute w-full text-xs text-muted-foreground pr-1 text-right"
-                    style={{ top: ((hour - 9) / 2) * (HOUR_HEIGHT / 2) - 4 }}
+                    style={{ top: (idx / 2) * (SLOT_HEIGHT) - 4 }}
                   >
-                    {hour}:00
+                    {slot.label}
                   </div>
                 ))}
               </div>
@@ -370,7 +376,7 @@ export const StaffCalendarView = () => {
               <div key={staff.id} className="flex-shrink-0 w-32 border-r border-border-subtle/50">
                 <div
                   className="relative"
-                  style={{ height: HOURS.length * (HOUR_HEIGHT / 2) }}
+                  style={{ height: TIME_SLOTS.length * (SLOT_HEIGHT / 2) }}
                   onDragOver={handleDragOver}
                   onDrop={(e) => handleDrop(e, staff.id, day)}
                 >
@@ -385,7 +391,7 @@ export const StaffCalendarView = () => {
                       className="absolute left-0.5 right-0.5 rounded px-1 py-0.5 cursor-pointer text-white text-[10px] hover:ring-2 hover:ring-white/50 transition-all"
                       style={{
                         top: calculateBlockPosition(res.reservation_time) / 2,
-                        height: Math.max(20, calculateBlockHeight(res.reservation_time, res.end_time) / 2),
+                        height: Math.max(15, calculateBlockHeight(res.reservation_time, res.end_time) / 2),
                         backgroundColor: staff.color,
                       }}
                     >

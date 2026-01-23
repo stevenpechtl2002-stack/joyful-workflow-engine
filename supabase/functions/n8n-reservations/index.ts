@@ -568,34 +568,87 @@ async function handleBooking(
     );
   }
 
-  // Find product if specified (by name or ID)
+  // Voice/Service category mapping
+  const voiceCategoryMap: Record<string, string[]> = {
+    'nägel': ['maniküre', 'shellac', 'acryl', 'gel', 'nagel', 'nail', 'modellage', 'lackieren'],
+    'maniküre': ['maniküre', 'manikuere', 'manicure', 'hand', 'hände'],
+    'shellac': ['shellac', 'farb-shellac', 'farbshellac', 'gel-lack', 'gellack'],
+    'acryl': ['acryl', 'acrylic', 'acrylnägel', 'acrylmodellage'],
+    'gel': ['gel', 'gelnägel', 'bio gel', 'biogel', 'gelmodellage', 'zehenmodellage'],
+    'pediküre': ['pediküre', 'pedikuere', 'pedicure', 'fuß', 'fuss', 'füße', 'fußpflege', 'spa pediküre'],
+    'wimpern': ['wimpern', 'lash', 'wimpernverlängerung', 'wimpernwelle', 'lash lift'],
+    'augenbrauen': ['augenbrauen', 'brow', 'brauen', 'laminierung', 'färben', 'zupfen'],
+    'gesicht': ['gesicht', 'face', 'facial', 'gesichtsbehandlung', 'gesichtsreinigung', 'anti-aging', 'akne'],
+    'permanent_makeup': ['permanent', 'pmu', 'permanent make-up', 'permanent makeup', 'augenbrauen permanent', 'lipliner', 'eyeliner'],
+    'headspa': ['headspa', 'head spa', 'kopfmassage', 'kopf', 'massage', 'entspannung'],
+    'makeup': ['make-up', 'makeup', 'schminken', 'styling']
+  };
+
+  // Find product if specified (by name, ID, or voice category)
   let productId: string | null = null;
   let pricePaid: number | null = payload.price_paid ?? null;
   
   if (payload.product_id) {
     productId = payload.product_id;
-  } else if (payload.product_name || payload.service_type) {
-    const productSearch = (payload.product_name || payload.service_type).toLowerCase().trim();
-    const { data: products } = await supabase
-      .from("products")
-      .select("id, name, price, is_active")
-      .eq("user_id", customer.id)
-      .eq("is_active", true);
-    
-    if (products?.length) {
-      // Exact match first, then partial
-      const exactMatch = products.find((p: any) => p.name.toLowerCase() === productSearch);
-      const partialMatch = products.find((p: any) => 
-        p.name.toLowerCase().includes(productSearch) || 
-        productSearch.includes(p.name.toLowerCase())
-      );
-      const foundProduct = exactMatch || partialMatch;
+  } else {
+    const searchTerms = [
+      payload.product_name,
+      payload.service_type,
+      payload.service_category,
+      payload.category
+    ].filter(Boolean).map(s => s.toLowerCase().trim());
+
+    if (searchTerms.length > 0) {
+      const { data: products } = await supabase
+        .from("products")
+        .select("id, name, category, price, duration_minutes, is_active")
+        .eq("user_id", customer.id)
+        .eq("is_active", true);
       
-      if (foundProduct) {
-        productId = foundProduct.id;
-        // Auto-set price if not provided
-        if (pricePaid === null) {
-          pricePaid = foundProduct.price;
+      if (products?.length) {
+        let foundProduct: any = null;
+
+        for (const searchTerm of searchTerms) {
+          if (foundProduct) break;
+
+          // 1. Exact name match
+          foundProduct = products.find((p: any) => p.name.toLowerCase() === searchTerm);
+
+          // 2. Partial name match
+          if (!foundProduct) {
+            foundProduct = products.find((p: any) => 
+              p.name.toLowerCase().includes(searchTerm) || 
+              searchTerm.includes(p.name.toLowerCase())
+            );
+          }
+
+          // 3. Category match (exact)
+          if (!foundProduct) {
+            foundProduct = products.find((p: any) => p.category.toLowerCase() === searchTerm);
+          }
+
+          // 4. Voice category mapping
+          if (!foundProduct) {
+            for (const [category, keywords] of Object.entries(voiceCategoryMap)) {
+              if (keywords.some(kw => searchTerm.includes(kw) || kw.includes(searchTerm))) {
+                // Find product in this category
+                foundProduct = products.find((p: any) => 
+                  p.category.toLowerCase() === category ||
+                  keywords.some(kw => p.name.toLowerCase().includes(kw) || p.category.toLowerCase().includes(kw))
+                );
+                if (foundProduct) break;
+              }
+            }
+          }
+        }
+        
+        if (foundProduct) {
+          productId = foundProduct.id;
+          // Auto-set price if not provided
+          if (pricePaid === null) {
+            pricePaid = foundProduct.price;
+          }
+          console.log(`Matched product: ${foundProduct.name} (${foundProduct.category}) - ${foundProduct.price}€`);
         }
       }
     }
