@@ -177,15 +177,21 @@ export const SmartTextImport = ({ isOpen, onClose, onSuccess, defaultDate, defau
       matchedFields++;
     }
 
-    // Extract time (HH:MM or H:MM)
-    const timeRegex = /\b(\d{1,2})[:\.](\d{2})\s*(?:uhr|h)?/i;
-    const timeMatch = text.match(timeRegex);
-    if (timeMatch) {
-      const hours = parseInt(timeMatch[1]);
-      const minutes = timeMatch[2];
-      if (hours >= 0 && hours <= 23) {
-        reservation_time = `${hours.toString().padStart(2, '0')}:${minutes}`;
-        matchedFields++;
+    // Extract time (HH:MM or H:MM with or without "Uhr"/"h")
+    // Match times like: 09:00, 9:00, 14:30, 09.00, 9:30 Uhr, etc.
+    const timeRegex = /\b(\d{1,2})[:\.](\d{2})(?:\s*(?:uhr|h))?\b/gi;
+    const timeMatches = [...text.matchAll(timeRegex)];
+    if (timeMatches.length > 0) {
+      // Take the first valid time that looks like a reservation time (not a duration)
+      for (const match of timeMatches) {
+        const hours = parseInt(match[1]);
+        const minutes = match[2];
+        // Valid hours for appointments (6-23)
+        if (hours >= 6 && hours <= 23) {
+          reservation_time = `${hours.toString().padStart(2, '0')}:${minutes}`;
+          matchedFields++;
+          break;
+        }
       }
     }
 
@@ -280,11 +286,45 @@ export const SmartTextImport = ({ isOpen, onClose, onSuccess, defaultDate, defau
       }
     }
 
-    // Extract notes/service and try to match product
-    const serviceRegex = /(?:service|behandlung|dienstleistung|termin für|für)[:\s]+(.+?)(?:\.|$)/i;
-    const serviceMatch = text.match(serviceRegex);
+    // Extract notes/service - collect all descriptive text
+    // Look for service descriptions, product names, or any multi-word descriptions
+    const servicePatterns = [
+      /(?:service|behandlung|dienstleistung|termin für|für)[:\s]+(.+?)(?:\n|$)/i,
+      /(?:luxus|spa|classic|premium|deluxe)\s+[a-zäöüß\s]+(?:mit[^.\n]+)?/gi,
+      /(?:maniküre|pediküre|massage|facial|waxing|shellac|gel|lack|nägel|headspa)[^.\n]*/gi,
+    ];
+    
+    let collectedNotes: string[] = [];
+    
+    // Pattern 1: Explicit service keywords
+    const serviceMatch = text.match(servicePatterns[0]);
     if (serviceMatch) {
-      notes = serviceMatch[1].trim();
+      collectedNotes.push(serviceMatch[1].trim());
+    }
+    
+    // Pattern 2: Look for descriptive lines (product descriptions with details)
+    // Reuse existing lines variable from above
+    for (const line of lines) {
+      // Skip lines that are just data (phone, email, date, time, status keywords)
+      if (/^[\d\s\-\+\(\)\.]+$/.test(line)) continue; // pure numbers (phone)
+      if (/@/.test(line)) continue; // email
+      if (/^\d{1,2}\.\d{1,2}\.\d{2,4}$/.test(line)) continue; // date
+      if (/^\d{1,2}:\d{2}$/.test(line)) continue; // time only
+      if (/^(bestätigt|abgeschlossen|storniert|pending|confirmed|cancelled|datum|dauer|teammitglied|endet um)$/i.test(line)) continue;
+      if (/^\d+\s*min\.?$/i.test(line)) continue; // duration
+      
+      // Look for product/service description lines (contain service keywords + extras)
+      if (/(?:mit|inkl|plus|\+|spa|luxus|classic|premium|behandlung|massage|maniküre|pediküre|shellac|gel)/i.test(line)) {
+        if (line.length > 10 && line.length < 200) {
+          collectedNotes.push(line);
+        }
+      }
+    }
+    
+    // Combine notes, remove duplicates
+    if (collectedNotes.length > 0) {
+      const uniqueNotes = [...new Set(collectedNotes)];
+      notes = uniqueNotes.join(' | ');
     }
 
     // Try to find matching product from the text
