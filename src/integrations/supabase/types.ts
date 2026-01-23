@@ -689,7 +689,42 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      customers_sales_view: {
+        Row: {
+          company_name: string | null
+          created_at: string | null
+          email: string | null
+          id: string | null
+          notes: string | null
+          plan: string | null
+          sales_rep_id: string | null
+          status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          company_name?: string | null
+          created_at?: string | null
+          email?: string | null
+          id?: string | null
+          notes?: string | null
+          plan?: string | null
+          sales_rep_id?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          company_name?: string | null
+          created_at?: string | null
+          email?: string | null
+          id?: string | null
+          notes?: string | null
+          plan?: string | null
+          sales_rep_id?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       has_role: {
