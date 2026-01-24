@@ -6,10 +6,11 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { ChevronLeft, ChevronRight, Plus, User, Phone, Mail, Clock, Calendar, Users, FileText, Pencil, Sparkles } from 'lucide-react';
-import { format, addDays, subDays, startOfWeek, endOfWeek, eachDayOfInterval, isSameDay } from 'date-fns';
+import { format, addDays, subDays, startOfWeek, endOfWeek, eachDayOfInterval, isSameDay, getDay } from 'date-fns';
 import { de } from 'date-fns/locale';
 import { useStaffMembers, useUpdateReservationStaff, StaffMember } from '@/hooks/useStaffMembers';
 import { useReservations } from '@/hooks/usePortalData';
+import { useStaffShifts } from '@/hooks/useStaffShifts';
 import { StaffManagementDialog } from './StaffManagementDialog';
 import ReservationForm from './ReservationForm';
 import { SmartTextImport } from './SmartTextImport';
@@ -57,6 +58,29 @@ export const StaffCalendarView = () => {
   const activeStaffMembers = staffMembers.filter(s => s.is_active);
   const { data: reservations = [], refetch } = useReservations();
   const updateStaffMutation = useUpdateReservationStaff();
+  const { shifts, getShiftForStaffAndDay } = useStaffShifts();
+
+  // Check if a staff member is working at a specific time on a given date
+  const isStaffWorkingAt = useCallback((staffId: string, date: Date, hour: number, minutes: number): boolean => {
+    // getDay returns 0=Sunday, we need to check the shift for this day
+    const dayOfWeek = getDay(date);
+    const shift = getShiftForStaffAndDay(staffId, dayOfWeek);
+    
+    // If no shift defined, assume working (default behavior)
+    if (!shift) return true;
+    
+    // If not working that day, return false
+    if (!shift.is_working) return false;
+    
+    // Check if the time is within working hours
+    const timeInMinutes = hour * 60 + minutes;
+    const [startH, startM] = shift.start_time.split(':').map(Number);
+    const [endH, endM] = shift.end_time.split(':').map(Number);
+    const shiftStartMinutes = startH * 60 + startM;
+    const shiftEndMinutes = endH * 60 + endM;
+    
+    return timeInMinutes >= shiftStartMinutes && timeInMinutes < shiftEndMinutes;
+  }, [getShiftForStaffAndDay]);
 
   const weekDays = useMemo(() => {
     if (viewMode === 'week') {
@@ -326,14 +350,22 @@ export const StaffCalendarView = () => {
             onDrop={(e) => handleDrop(e, staff.id, currentDate)}
           >
             {/* 30-min slot lines */}
-            {TIME_SLOTS.map((slot, idx) => (
-              <div
-                key={slot.label}
-                className={`absolute w-full border-t ${slot.minutes === 0 ? 'border-border-subtle' : 'border-border-subtle/30'} hover:bg-primary/5 cursor-pointer transition-colors`}
-                style={{ top: idx * SLOT_HEIGHT, height: SLOT_HEIGHT }}
-                onClick={() => handleSlotClick(currentDate, slot.hour, slot.minutes, staff.id)}
-              />
-            ))}
+            {TIME_SLOTS.map((slot, idx) => {
+              const isWorking = isStaffWorkingAt(staff.id, currentDate, slot.hour, slot.minutes);
+              return (
+                <div
+                  key={slot.label}
+                  className={`absolute w-full border-t ${slot.minutes === 0 ? 'border-border-subtle' : 'border-border-subtle/30'} ${
+                    isWorking 
+                      ? 'hover:bg-primary/5 cursor-pointer' 
+                      : 'bg-muted/60 cursor-not-allowed'
+                  } transition-colors`}
+                  style={{ top: idx * SLOT_HEIGHT, height: SLOT_HEIGHT }}
+                  onClick={() => isWorking && handleSlotClick(currentDate, slot.hour, slot.minutes, staff.id)}
+                  title={!isWorking ? 'Nicht im Dienst' : undefined}
+                />
+              );
+            })}
 
             {/* Reservations */}
             {getReservationsForStaffAndDate(staff.id, currentDate).map((res) => (
