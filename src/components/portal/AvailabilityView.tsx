@@ -47,11 +47,13 @@ export const AvailabilityView = () => {
   }, []);
 
   // Calculate availability per staff member
+  // A slot is available if NO reservation overlaps with it
+  // We only block the exact time of the reservation, not assuming future duration
   const availabilityMatrix = useMemo(() => {
     if (!reservations || !activeStaff.length) return {};
 
     const dateStr = format(selectedDate, 'yyyy-MM-dd');
-    const durationMinutes = 90;
+    const slotDurationMinutes = 30; // Each slot represents 30 minutes
 
     const matrix: Record<string, TimeSlot[]> = {};
 
@@ -64,13 +66,20 @@ export const AvailabilityView = () => {
 
       matrix[staff.id] = timeSlots.map(slotTime => {
         const slotStart = new Date(`${dateStr}T${slotTime}:00`);
-        const slotEnd = new Date(slotStart.getTime() + durationMinutes * 60000);
+        const slotEnd = new Date(slotStart.getTime() + slotDurationMinutes * 60000);
 
+        // Check if this 30-min slot overlaps with any existing reservation
         const hasConflict = staffReservations.some(res => {
           const resStart = new Date(`${dateStr}T${res.reservation_time}`);
-          const resEnd = res.end_time 
-            ? new Date(`${dateStr}T${res.end_time}`)
-            : new Date(resStart.getTime() + durationMinutes * 60000);
+          // Use actual end_time if available, otherwise estimate from duration or default to 60min
+          let resEnd: Date;
+          if (res.end_time) {
+            resEnd = new Date(`${dateStr}T${res.end_time}`);
+          } else {
+            // Default to 60 minutes if no end_time
+            resEnd = new Date(resStart.getTime() + 60 * 60000);
+          }
+          // Overlap check: slot overlaps if it starts before reservation ends AND ends after reservation starts
           return (slotStart < resEnd && slotEnd > resStart);
         });
 
