@@ -37,6 +37,7 @@ export const useStaffShifts = () => {
       const { data, error } = await supabase
         .from('staff_shifts')
         .select('*')
+        .eq('user_id', user!.id)
         .order('staff_member_id')
         .order('day_of_week');
 
