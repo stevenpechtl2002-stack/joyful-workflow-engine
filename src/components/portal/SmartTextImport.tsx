@@ -76,6 +76,8 @@ export const SmartTextImport = ({ isOpen, onClose, onSuccess, defaultDate, defau
   const [isProcessingImage, setIsProcessingImage] = useState(false);
   const [parsedAppointments, setParsedAppointments] = useState<any[]>([]);
   const [selectedAppointmentIndex, setSelectedAppointmentIndex] = useState(0);
+  const [selectedForBulk, setSelectedForBulk] = useState<number[]>([]);
+  const [isBulkSaving, setIsBulkSaving] = useState(false);
   const { user } = useAuth();
   const { staffMembers } = useStaffMembers();
   const activeStaff = staffMembers.filter(s => s.is_active);
@@ -470,8 +472,10 @@ export const SmartTextImport = ({ isOpen, onClose, onSuccess, defaultDate, defau
       
       if (appointments && appointments.length > 0) {
         setParsedAppointments(appointments);
-        toast.success(`${appointments.length} Termin(e) erkannt!`);
-        // Auto-select first appointment
+        // Auto-select all for bulk import
+        setSelectedForBulk(appointments.map((_: any, i: number) => i));
+        toast.success(`${appointments.length} Termin(e) erkannt! Wähle Termine für Bulk-Import.`);
+        // Auto-select first appointment for preview
         selectAppointmentFromImage(appointments[0], 0);
       } else {
         toast.info('Keine Termine im Bild erkannt');
@@ -593,7 +597,114 @@ export const SmartTextImport = ({ isOpen, onClose, onSuccess, defaultDate, defau
     setIsEditing(false);
     setParsedAppointments([]);
     setSelectedAppointmentIndex(0);
+    setSelectedForBulk([]);
     onClose();
+  };
+
+  // Toggle selection for bulk import
+  const toggleBulkSelection = (index: number) => {
+    setSelectedForBulk(prev => 
+      prev.includes(index) 
+        ? prev.filter(i => i !== index)
+        : [...prev, index]
+    );
+  };
+
+  // Select/deselect all for bulk
+  const toggleSelectAll = () => {
+    if (selectedForBulk.length === parsedAppointments.length) {
+      setSelectedForBulk([]);
+    } else {
+      setSelectedForBulk(parsedAppointments.map((_, i) => i));
+    }
+  };
+
+  // Bulk save all selected appointments
+  const handleBulkSave = async () => {
+    if (!user || selectedForBulk.length === 0) return;
+
+    setIsBulkSaving(true);
+    let successCount = 0;
+    let errorCount = 0;
+
+    try {
+      for (const index of selectedForBulk) {
+        const appointment = parsedAppointments[index];
+        
+        // Find matching staff
+        let staffId: string | null = null;
+        if (appointment.staff_name) {
+          const matchedStaff = activeStaff.find(s => 
+            s.name.toLowerCase().includes(appointment.staff_name.toLowerCase()) ||
+            appointment.staff_name.toLowerCase().includes(s.name.toLowerCase())
+          );
+          if (matchedStaff) staffId = matchedStaff.id;
+        }
+        
+        // Find matching product
+        let productId: string | null = null;
+        let pricePaid: number | null = null;
+        let durationMinutes = 30; // Default duration
+        if (appointment.service) {
+          const matchedProduct = products.find(p => 
+            p.name.toLowerCase().includes(appointment.service.toLowerCase()) ||
+            appointment.service.toLowerCase().includes(p.name.toLowerCase())
+          );
+          if (matchedProduct) {
+            productId = matchedProduct.id;
+            pricePaid = matchedProduct.price;
+            durationMinutes = matchedProduct.duration_minutes || 30;
+          }
+        }
+        
+        // Calculate end_time
+        const startTime = appointment.reservation_time || '10:00';
+        const [hours, minutes] = startTime.split(':').map(Number);
+        const endDate = new Date();
+        endDate.setHours(hours, minutes + durationMinutes, 0, 0);
+        const endTime = `${endDate.getHours().toString().padStart(2, '0')}:${endDate.getMinutes().toString().padStart(2, '0')}`;
+        
+        const reservationDate = appointment.reservation_date || format(defaultDate || new Date(), 'yyyy-MM-dd');
+        
+        const { error } = await supabase.from('reservations').insert({
+          user_id: user.id,
+          customer_name: appointment.customer_name || 'Unbekannter Kunde',
+          customer_phone: null,
+          customer_email: null,
+          reservation_date: reservationDate,
+          reservation_time: startTime,
+          end_time: endTime,
+          party_size: 1,
+          notes: appointment.service || appointment.notes || null,
+          staff_member_id: staffId,
+          product_id: productId,
+          price_paid: pricePaid,
+          status: 'confirmed',
+          source: 'manual'
+        });
+
+        if (error) {
+          console.error('Bulk import error:', error);
+          errorCount++;
+        } else {
+          successCount++;
+        }
+      }
+
+      if (successCount > 0) {
+        toast.success(`${successCount} Termin(e) erfolgreich importiert!`);
+        onSuccess();
+      }
+      if (errorCount > 0) {
+        toast.error(`${errorCount} Termin(e) konnten nicht importiert werden.`);
+      }
+      
+      handleClose();
+    } catch (error: any) {
+      toast.error('Fehler beim Bulk-Import: ' + error.message);
+    } finally {
+      setIsBulkSaving(false);
+    }
   };
 
   const getConfidenceColor = (confidence: 'high' | 'medium' | 'low') => {
@@ -647,25 +758,83 @@ export const SmartTextImport = ({ isOpen, onClose, onSuccess, defaultDate, defau
             />
           </div>
 
-          {/* Parsed appointments from image */}
-          {parsedAppointments.length > 1 && (
-            <Card className="p-3 bg-primary/5 border-primary/20">
-              <div className="flex items-center gap-2 mb-2">
-                <ImageIcon className="w-4 h-4 text-primary" />
-                <span className="text-sm font-medium">{parsedAppointments.length} Termine erkannt</span>
+          {/* Parsed appointments from image - Bulk Import UI */}
+          {parsedAppointments.length > 0 && (
+            <Card className="p-4 bg-primary/5 border-primary/20">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <ImageIcon className="w-4 h-4 text-primary" />
+                  <span className="text-sm font-medium">{parsedAppointments.length} Termine erkannt</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button variant="ghost" size="sm" onClick={toggleSelectAll}>
+                    {selectedForBulk.length === parsedAppointments.length ? 'Keine auswählen' : 'Alle auswählen'}
+                  </Button>
+                  <Badge variant="secondary">
+                    {selectedForBulk.length} ausgewählt
+                  </Badge>
+                </div>
               </div>
-              <div className="flex flex-wrap gap-2">
+              
+              {/* Appointment list with checkboxes */}
+              <div className="space-y-2 max-h-[200px] overflow-y-auto">
                 {parsedAppointments.map((apt, idx) => (
-                  <Button
+                  <div 
                     key={idx}
-                    variant={selectedAppointmentIndex === idx ? "default" : "outline"}
-                    size="sm"
+                    className={cn(
+                      "flex items-center gap-3 p-2 rounded-lg border cursor-pointer transition-colors",
+                      selectedForBulk.includes(idx) ? "bg-primary/10 border-primary/30" : "bg-background border-border",
+                      selectedAppointmentIndex === idx && "ring-2 ring-primary"
+                    )}
                     onClick={() => selectAppointmentFromImage(apt, idx)}
                   >
-                    {apt.reservation_time} - {apt.customer_name || 'Termin ' + (idx + 1)}
-                  </Button>
+                    <input
+                      type="checkbox"
+                      checked={selectedForBulk.includes(idx)}
+                      onChange={(e) => {
+                        e.stopPropagation();
+                        toggleBulkSelection(idx);
+                      }}
+                      className="w-4 h-4 rounded border-primary text-primary focus:ring-primary"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium truncate">{apt.customer_name || 'Unbekannt'}</span>
+                        <Badge variant="outline" className="text-xs">
+                          {apt.reservation_date} {apt.reservation_time}
+                        </Badge>
+                      </div>
+                      {apt.service && (
+                        <p className="text-xs text-muted-foreground truncate">{apt.service}</p>
+                      )}
+                    </div>
+                    {apt.staff_name && (
+                      <Badge variant="secondary" className="text-xs">{apt.staff_name}</Badge>
+                    )}
+                  </div>
                 ))}
               </div>
+              
+              {/* Bulk import button */}
+              {selectedForBulk.length > 0 && (
+                <Button 
+                  className="w-full mt-3" 
+                  onClick={handleBulkSave}
+                  disabled={isBulkSaving}
+                >
+                  {isBulkSaving ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Importiere {selectedForBulk.length} Termine...
+                    </>
+                  ) : (
+                    <>
+                      <Check className="w-4 h-4 mr-2" />
+                      {selectedForBulk.length} Termine importieren
+                    </>
+                  )}
+                </Button>
+              )}
             </Card>
           )}
 
