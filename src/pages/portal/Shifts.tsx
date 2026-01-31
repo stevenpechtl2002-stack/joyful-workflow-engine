@@ -77,6 +77,11 @@ const Shifts = () => {
   };
 
   const handleBulkApply = async () => {
+    if (bulkDays.length === 0) {
+      toast.error('Bitte mindestens einen Tag auswählen');
+      return;
+    }
+    
     const shiftsToCreate = activeStaff.flatMap((staff) =>
       bulkDays.map((dayIndex) => ({
         staff_member_id: staff.id,
@@ -87,8 +92,15 @@ const Shifts = () => {
       }))
     );
 
+    const dayNames = bulkDays.map(d => WEEKDAYS[d]).join(', ');
+    console.log(`Bulk apply: ${dayNames} - is_working: ${bulkIsWorking}`);
+    
     await upsertBulkShifts.mutateAsync(shiftsToCreate);
     setIsBulkDialogOpen(false);
+    
+    if (!bulkIsWorking) {
+      toast.success(`${dayNames} für alle als "Frei" gesetzt`);
+    }
   };
 
   const toggleBulkDay = (dayIndex: number) => {
@@ -149,7 +161,16 @@ const Shifts = () => {
         </div>
         
         <div className="flex items-center gap-2">
-          <Dialog open={isBulkDialogOpen} onOpenChange={setIsBulkDialogOpen}>
+          <Dialog open={isBulkDialogOpen} onOpenChange={(open) => {
+            if (open) {
+              // Reset to default values when opening
+              setBulkDays([]);
+              setBulkIsWorking(true);
+              setBulkStartTime(DEFAULT_START);
+              setBulkEndTime(DEFAULT_END);
+            }
+            setIsBulkDialogOpen(open);
+          }}>
             <DialogTrigger asChild>
               <Button className="gap-2">
                 <Users className="w-4 h-4" />
