@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { useStaffMembers } from '@/hooks/useStaffMembers';
 import { useReservations } from '@/hooks/usePortalData';
 import { supabase } from '@/integrations/supabase/client';
@@ -30,8 +30,9 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { Plus, Pencil, Trash2, GripVertical, UserCircle, ArrowRight } from 'lucide-react';
+import { Plus, Pencil, Trash2, GripVertical, UserCircle, ArrowRight, ChevronUp, ChevronDown } from 'lucide-react';
 import { toast } from 'sonner';
+import { useQueryClient } from '@tanstack/react-query';
 
 const COLORS = [
   '#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6',
@@ -41,10 +42,12 @@ const COLORS = [
 const Staff = () => {
   const { staffMembers, isLoading, createStaffMember, updateStaffMember, deleteStaffMember } = useStaffMembers();
   const { data: reservations = [], refetch: refetchReservations } = useReservations();
+  const queryClient = useQueryClient();
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingStaff, setEditingStaff] = useState<any>(null);
   const [newStaffName, setNewStaffName] = useState('');
   const [newStaffColor, setNewStaffColor] = useState(COLORS[0]);
+  const [isReordering, setIsReordering] = useState(false);
   
   // Deactivation with reassignment
   const [deactivatingStaff, setDeactivatingStaff] = useState<any>(null);
@@ -56,6 +59,41 @@ const Staff = () => {
   const getStaffReservationCount = (staffId: string) => {
     return reservations.filter(r => r.staff_member_id === staffId).length;
   };
+  
+  // Move staff member up or down in order
+  const moveStaff = useCallback(async (staffId: string, direction: 'up' | 'down') => {
+    const currentIndex = staffMembers.findIndex(s => s.id === staffId);
+    if (currentIndex === -1) return;
+    
+    const newIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
+    if (newIndex < 0 || newIndex >= staffMembers.length) return;
+    
+    setIsReordering(true);
+    
+    try {
+      // Update sort_order for both affected staff members
+      const currentStaff = staffMembers[currentIndex];
+      const swapStaff = staffMembers[newIndex];
+      
+      await Promise.all([
+        supabase
+          .from('staff_members')
+          .update({ sort_order: newIndex })
+          .eq('id', currentStaff.id),
+        supabase
+          .from('staff_members')
+          .update({ sort_order: currentIndex })
+          .eq('id', swapStaff.id)
+      ]);
+      
+      queryClient.invalidateQueries({ queryKey: ['staff-members'] });
+      toast.success('Reihenfolge aktualisiert');
+    } catch (error) {
+      toast.error('Fehler beim Verschieben');
+    } finally {
+      setIsReordering(false);
+    }
+  }, [staffMembers, queryClient]);
 
   const handleAddStaff = async () => {
     if (!newStaffName.trim()) {
@@ -274,7 +312,27 @@ const Staff = () => {
           staffMembers.map((staff, index) => (
             <Card key={staff.id} className={!staff.is_active ? 'opacity-60' : ''}>
               <CardContent className="flex items-center gap-4 py-4">
-                <GripVertical className="w-5 h-5 text-muted-foreground cursor-grab" />
+                {/* Reorder buttons */}
+                <div className="flex flex-col gap-0.5">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6"
+                    disabled={index === 0 || isReordering}
+                    onClick={() => moveStaff(staff.id, 'up')}
+                  >
+                    <ChevronUp className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6"
+                    disabled={index === staffMembers.length - 1 || isReordering}
+                    onClick={() => moveStaff(staff.id, 'down')}
+                  >
+                    <ChevronDown className="w-4 h-4" />
+                  </Button>
+                </div>
                 
                 <Avatar className="w-12 h-12 border-2" style={{ borderColor: staff.color }}>
                   <AvatarImage src={staff.avatar_url || undefined} />
