@@ -12,6 +12,7 @@ import { useStaffMembers, useUpdateReservationStaff, StaffMember } from '@/hooks
 import { useReservations } from '@/hooks/usePortalData';
 import { useStaffShifts } from '@/hooks/useStaffShifts';
 import { useShiftExceptions } from '@/hooks/useShiftExceptions';
+import { useBusinessSettings } from '@/hooks/useBusinessSettings';
 import { StaffManagementDialog } from './StaffManagementDialog';
 import ReservationForm from './ReservationForm';
 import { SmartTextImport } from './SmartTextImport';
@@ -61,18 +62,23 @@ export const StaffCalendarView = () => {
   const updateStaffMutation = useUpdateReservationStaff();
   const { shifts, getShiftForStaffAndDay } = useStaffShifts();
   const { hasExceptionAt } = useShiftExceptions();
+  const { isDayClosed } = useBusinessSettings();
 
   // Check if a staff member is working at a specific time on a given date
   const isStaffWorkingAt = useCallback((staffId: string, date: Date, hour: number, minutes: number): boolean => {
     const dateStr = format(date, 'yyyy-MM-dd');
     
-    // First check if there's an exception (time-off) for this slot
+    // First check if this is a global closed day (Ruhetag)
+    const dayOfWeek = getDay(date);
+    if (isDayClosed(dayOfWeek)) {
+      return false; // Ruhetag = komplett blockiert
+    }
+    
+    // Check if there's an exception (time-off) for this slot
     if (hasExceptionAt(staffId, dateStr, hour, minutes)) {
       return false; // Freigestellt = nicht verfügbar
     }
     
-    // getDay returns 0=Sunday, we need to check the shift for this day
-    const dayOfWeek = getDay(date);
     const shift = getShiftForStaffAndDay(staffId, dayOfWeek);
     
     // If no shift defined, assume working (default behavior)
@@ -89,7 +95,12 @@ export const StaffCalendarView = () => {
     const shiftEndMinutes = endH * 60 + endM;
     
     return timeInMinutes >= shiftStartMinutes && timeInMinutes < shiftEndMinutes;
-  }, [getShiftForStaffAndDay, hasExceptionAt]);
+  }, [getShiftForStaffAndDay, hasExceptionAt, isDayClosed]);
+  
+  // Check if entire day is a closed day
+  const isClosedDay = useCallback((date: Date): boolean => {
+    return isDayClosed(getDay(date));
+  }, [isDayClosed]);
 
   const weekDays = useMemo(() => {
     if (viewMode === 'week') {

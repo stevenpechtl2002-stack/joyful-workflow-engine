@@ -13,18 +13,21 @@ import {
   Clock,
   CheckCircle2,
   XCircle,
-  Ban
+  Ban,
+  Building2
 } from 'lucide-react';
 import { useStaffMembers } from '@/hooks/useStaffMembers';
 import { useReservations } from '@/hooks/usePortalData';
 import { useShiftExceptions } from '@/hooks/useShiftExceptions';
-import { format, addDays, subDays, isSameDay } from 'date-fns';
+import { useBusinessSettings } from '@/hooks/useBusinessSettings';
+import { format, addDays, subDays, isSameDay, getDay } from 'date-fns';
 import { de } from 'date-fns/locale';
 
 interface TimeSlot {
   time: string;
   available: boolean;
   blockedByException?: boolean;
+  blockedByClosedDay?: boolean;
   conflictingReservation?: {
     customer_name: string;
     reservation_time: string;
@@ -39,6 +42,7 @@ export const AvailabilityView = () => {
   const { staffMembers, isLoading: staffLoading } = useStaffMembers();
   const { data: reservations, isLoading: reservationsLoading } = useReservations();
   const { hasExceptionAt, isLoading: exceptionsLoading } = useShiftExceptions();
+  const { isDayClosed } = useBusinessSettings();
 
   const activeStaff = useMemo(() => 
     staffMembers?.filter(s => s.is_active) || [], 
@@ -55,8 +59,13 @@ export const AvailabilityView = () => {
     return slots;
   }, []);
 
+  // Check if selected date is a global closed day
+  const isClosedDay = useMemo(() => {
+    return isDayClosed(getDay(selectedDate));
+  }, [selectedDate, isDayClosed]);
+
   // Calculate availability per staff member
-  // A slot is blocked if: 1) There's a reservation OR 2) There's a shift exception (Freistellung)
+  // A slot is blocked if: 1) Global closed day OR 2) Shift exception OR 3) Reservation overlap
   const availabilityMatrix = useMemo(() => {
     if (!reservations || !activeStaff.length) return {};
 
@@ -66,6 +75,16 @@ export const AvailabilityView = () => {
     const matrix: Record<string, TimeSlot[]> = {};
 
     activeStaff.forEach(staff => {
+      // If it's a closed day, all slots are blocked
+      if (isClosedDay) {
+        matrix[staff.id] = timeSlots.map(slotTime => ({
+          time: slotTime,
+          available: false,
+          blockedByClosedDay: true
+        }));
+        return;
+      }
+
       const staffReservations = reservations.filter(res => 
         res.reservation_date === dateStr && 
         res.staff_member_id === staff.id &&
@@ -77,7 +96,7 @@ export const AvailabilityView = () => {
         const slotStart = new Date(`${dateStr}T${slotTime}:00`);
         const slotEnd = new Date(slotStart.getTime() + slotDurationMinutes * 60000);
 
-        // FIRST: Check if there's a shift exception (Freistellung) blocking this slot
+        // Check if there's a shift exception (Freistellung) blocking this slot
         const isExceptionBlocked = hasExceptionAt(staff.id, dateStr, slotHour, slotMinutes);
         
         if (isExceptionBlocked) {
@@ -88,7 +107,7 @@ export const AvailabilityView = () => {
           };
         }
 
-        // THEN: Check if this 30-min slot overlaps with any existing reservation
+        // Check if this 30-min slot overlaps with any existing reservation
         let conflictingRes: typeof staffReservations[0] | undefined;
         const hasConflict = staffReservations.some(res => {
           const resStart = new Date(`${dateStr}T${res.reservation_time}`);
@@ -117,7 +136,7 @@ export const AvailabilityView = () => {
     });
 
     return matrix;
-  }, [reservations, activeStaff, selectedDate, timeSlots, hasExceptionAt]);
+  }, [reservations, activeStaff, selectedDate, timeSlots, hasExceptionAt, isClosedDay]);
 
   // Count free slots per staff
   const freeSlotCounts = useMemo(() => {
@@ -178,9 +197,18 @@ export const AvailabilityView = () => {
           </div>
         </div>
         
-        <p className="text-sm text-muted-foreground mt-2">
-          Nur freie Zeitfenster pro Mitarbeiter – ideal für schnelle Verfügbarkeitsprüfung.
-        </p>
+        {isClosedDay ? (
+          <div className="flex items-center gap-2 mt-2 p-2 rounded-lg bg-muted">
+            <Building2 className="w-4 h-4 text-muted-foreground" />
+            <p className="text-sm text-muted-foreground font-medium">
+              Ruhetag – Geschäft geschlossen
+            </p>
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground mt-2">
+            Nur freie Zeitfenster pro Mitarbeiter – ideal für schnelle Verfügbarkeitsprüfung.
+          </p>
+        )}
       </CardHeader>
       
       <CardContent>
@@ -244,21 +272,39 @@ export const AvailabilityView = () => {
                         const isAvailable = slot?.available || false;
 
                         const conflictInfo = slot?.conflictingReservation;
+                        const isClosedDayBlocked = slot?.blockedByClosedDay;
+                        const isExceptionBlocked = slot?.blockedByException;
                         
                         return (
                           <div key={`${staff.id}-${slotTime}`} className="flex justify-center">
                             {isAvailable ? (
                               <Badge 
                                 variant="outline" 
-                                className="bg-green-500/10 text-green-600 border-green-500/30 hover:bg-green-500/20 cursor-default"
+                                className="bg-emerald-500/10 text-emerald-600 border-emerald-500/30 hover:bg-emerald-500/20 cursor-default"
                               >
                                 <CheckCircle2 className="w-3 h-3 mr-1" />
+                                Frei
+                              </Badge>
+                            ) : isClosedDayBlocked ? (
+                              <Badge 
+                                variant="outline" 
+                                className="bg-muted text-muted-foreground border-border cursor-default"
+                              >
+                                <Building2 className="w-3 h-3 mr-1" />
+                                Ruhetag
+                              </Badge>
+                            ) : isExceptionBlocked ? (
+                              <Badge 
+                                variant="outline" 
+                                className="bg-amber-500/10 text-amber-600 border-amber-500/30 cursor-default"
+                              >
+                                <Ban className="w-3 h-3 mr-1" />
                                 Frei
                               </Badge>
                             ) : conflictInfo ? (
                               <Badge 
                                 variant="outline" 
-                                className="bg-red-500/10 text-red-600 border-red-500/30 cursor-default text-xs"
+                                className="bg-destructive/10 text-destructive border-destructive/30 cursor-default text-xs"
                               >
                                 <XCircle className="w-3 h-3 mr-1" />
                                 {conflictInfo.reservation_time.slice(0, 5)}

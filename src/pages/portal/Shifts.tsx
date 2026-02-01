@@ -2,8 +2,9 @@ import { useState, useMemo, useCallback } from 'react';
 import { useStaffMembers } from '@/hooks/useStaffMembers';
 import { useStaffShifts } from '@/hooks/useStaffShifts';
 import { useShiftExceptions } from '@/hooks/useShiftExceptions';
+import { useBusinessSettings, DAY_INDEX_TO_KEY } from '@/hooks/useBusinessSettings';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
@@ -21,7 +22,7 @@ import {
   DialogClose
 } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Clock, CalendarDays, Save, UserCircle, Users, Loader2, CalendarOff, Plus, Trash2, CalendarIcon } from 'lucide-react';
+import { Clock, CalendarDays, Save, UserCircle, Users, Loader2, CalendarOff, Plus, Trash2, CalendarIcon, Building2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
@@ -36,6 +37,7 @@ const Shifts = () => {
   const { staffMembers, isLoading: staffLoading } = useStaffMembers();
   const { shifts, isLoading: shiftsLoading, upsertShift, upsertBulkShifts, getShiftForStaffAndDay, isUpserting, isBulkUpserting } = useStaffShifts();
   const { exceptions, createException, deleteException, isCreating, isDeleting } = useShiftExceptions();
+  const { openingHours, isDayClosed, updateOpeningHours, isUpdating: isUpdatingBusinessSettings } = useBusinessSettings();
   
   const [selectedStaff, setSelectedStaff] = useState<string | null>(null);
   const [editingSchedule, setEditingSchedule] = useState<{
@@ -267,8 +269,12 @@ const Shifts = () => {
           </CardContent>
         </Card>
       ) : (
-        <Tabs defaultValue="overview" className="space-y-4">
+        <Tabs defaultValue="closeddays" className="space-y-4">
           <TabsList>
+            <TabsTrigger value="closeddays" className="gap-2">
+              <Building2 className="w-4 h-4" />
+              Ruhetage
+            </TabsTrigger>
             <TabsTrigger value="overview" className="gap-2">
               <CalendarDays className="w-4 h-4" />
               Wochenübersicht
@@ -282,6 +288,81 @@ const Shifts = () => {
               Freistellungen
             </TabsTrigger>
           </TabsList>
+
+          {/* Global Closed Days */}
+          <TabsContent value="closeddays">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Building2 className="w-5 h-5" />
+                  Globale Ruhetage
+                </CardTitle>
+                <CardDescription>
+                  Wählen Sie Tage, an denen Ihr Geschäft geschlossen ist. Diese Tage werden im Kalender für alle Mitarbeiter blockiert und ausgegraut.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                  {WEEKDAYS.map((day, index) => {
+                    const dayKey = DAY_INDEX_TO_KEY[index];
+                    const isClosed = openingHours[dayKey]?.closed ?? false;
+                    
+                    return (
+                      <div 
+                        key={day}
+                        className={cn(
+                          "p-4 rounded-lg border-2 transition-all cursor-pointer",
+                          isClosed 
+                            ? "bg-destructive/10 border-destructive/50" 
+                            : "bg-primary/5 border-primary/20 hover:border-primary/40"
+                        )}
+                        onClick={() => {
+                          const newOpeningHours = {
+                            ...openingHours,
+                            [dayKey]: {
+                              ...openingHours[dayKey],
+                              closed: !isClosed
+                            }
+                          };
+                          updateOpeningHours(newOpeningHours);
+                        }}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="font-medium">{day}</span>
+                          <Switch 
+                            checked={!isClosed} 
+                            onCheckedChange={(checked) => {
+                              const newOpeningHours = {
+                                ...openingHours,
+                                [dayKey]: {
+                                  ...openingHours[dayKey],
+                                  closed: !checked
+                                }
+                              };
+                              updateOpeningHours(newOpeningHours);
+                            }}
+                          />
+                        </div>
+                        <p className={cn(
+                          "text-sm mt-2",
+                          isClosed ? "text-destructive" : "text-muted-foreground"
+                        )}>
+                          {isClosed ? 'Geschlossen (Ruhetag)' : 'Geöffnet'}
+                        </p>
+                      </div>
+                    );
+                  })}
+                </div>
+                
+                <div className="p-4 bg-muted/50 rounded-lg">
+                  <p className="text-sm text-muted-foreground">
+                    <strong>Hinweis:</strong> Ruhetage werden automatisch im Mitarbeiter-Kalender blockiert und ausgegraut. 
+                    Termine können an diesen Tagen nicht gebucht werden.
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
 
           {/* Week Overview */}
           <TabsContent value="overview">
