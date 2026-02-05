@@ -6,7 +6,6 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { 
   ChevronLeft, 
   ChevronRight, 
@@ -16,7 +15,8 @@ import {
   XCircle,
   Ban,
   Building2,
-  Plus
+  Plus,
+  Loader2
 } from 'lucide-react';
 import { useStaffMembers } from '@/hooks/useStaffMembers';
 import { useReservations } from '@/hooks/usePortalData';
@@ -24,7 +24,9 @@ import { useShiftExceptions } from '@/hooks/useShiftExceptions';
 import { useBusinessSettings } from '@/hooks/useBusinessSettings';
 import { format, addDays, subDays, isSameDay, getDay } from 'date-fns';
 import { de } from 'date-fns/locale';
-import ReservationForm from './ReservationForm';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
+import { toast } from 'sonner';
 
 interface TimeSlot {
   time: string;
@@ -41,13 +43,13 @@ interface TimeSlot {
 export const AvailabilityView = () => {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
-  const [isBookingOpen, setIsBookingOpen] = useState(false);
-  const [selectedSlot, setSelectedSlot] = useState<{ time: string; staffId: string; staffName: string } | null>(null);
+  const [bookingSlot, setBookingSlot] = useState<string | null>(null); // "staffId-time" for loading state
   
   const { staffMembers, isLoading: staffLoading } = useStaffMembers();
   const { data: reservations, isLoading: reservationsLoading, refetch } = useReservations();
   const { hasExceptionAt, isLoading: exceptionsLoading } = useShiftExceptions();
   const { isDayClosed } = useBusinessSettings();
+  const { user } = useAuth();
 
   const activeStaff = useMemo(() => 
     staffMembers?.filter(s => s.is_active) || [], 
@@ -154,13 +156,50 @@ export const AvailabilityView = () => {
 
   const isLoading = staffLoading || reservationsLoading || exceptionsLoading;
 
-  const handleSlotClick = (staffId: string, staffName: string, slotTime: string) => {
-    setSelectedSlot({ time: slotTime, staffId, staffName });
-    setIsBookingOpen(true);
+  const handleSlotClick = async (staffId: string, staffName: string, slotTime: string) => {
+    if (!user?.id) {
+      toast.error('Nicht angemeldet');
+      return;
+    }
+
+    const slotKey = `${staffId}-${slotTime}`;
+    setBookingSlot(slotKey);
+
+    try {
+      // Calculate end time (30 min after start)
+      const [hours, minutes] = slotTime.split(':').map(Number);
+      const endDate = new Date();
+      endDate.setHours(hours, minutes + 30, 0, 0);
+      const endTime = `${endDate.getHours().toString().padStart(2, '0')}:${endDate.getMinutes().toString().padStart(2, '0')}`;
+
+      const { error } = await supabase
+        .from('reservations')
+        .insert({
+          user_id: user.id,
+          customer_name: 'Blockiert',
+          reservation_date: format(selectedDate, 'yyyy-MM-dd'),
+          reservation_time: slotTime,
+          end_time: endTime,
+          party_size: 1,
+          status: 'confirmed',
+          source: 'manual',
+          staff_member_id: staffId,
+          notes: 'Slot blockiert',
+        });
+
+      if (error) throw error;
+
+      toast.success(`${slotTime} Uhr bei ${staffName} blockiert`);
+      refetch();
+    } catch (error: any) {
+      console.error('Booking error:', error);
+      toast.error('Fehler beim Blockieren: ' + error.message);
+    } finally {
+      setBookingSlot(null);
+    }
   };
 
   return (
-    <>
     <Card className="glass border-border/50">
       <CardHeader className="pb-4">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -281,6 +320,8 @@ export const AvailabilityView = () => {
                       {activeStaff.map(staff => {
                         const slot = availabilityMatrix[staff.id]?.find(s => s.time === slotTime);
                         const isAvailable = slot?.available || false;
+                        const slotKey = `${staff.id}-${slotTime}`;
+                        const isBooking = bookingSlot === slotKey;
 
                         const conflictInfo = slot?.conflictingReservation;
                         const isClosedDayBlocked = slot?.blockedByClosedDay;
@@ -288,7 +329,15 @@ export const AvailabilityView = () => {
                         
                         return (
                           <div key={`${staff.id}-${slotTime}`} className="flex justify-center">
-                            {isAvailable ? (
+                            {isBooking ? (
+                              <Badge 
+                                variant="outline" 
+                                className="bg-primary/10 text-primary border-primary/30"
+                              >
+                                <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                                ...
+                              </Badge>
+                            ) : isAvailable ? (
                               <Badge 
                                 variant="outline" 
                                 className="bg-emerald-500/10 text-emerald-600 border-emerald-500/30 hover:bg-emerald-500/30 cursor-pointer transition-colors"
@@ -361,41 +410,5 @@ export const AvailabilityView = () => {
         )}
       </CardContent>
     </Card>
-
-    {/* Booking Dialog */}
-    <Dialog open={isBookingOpen} onOpenChange={setIsBookingOpen}>
-      <DialogContent className="max-w-lg">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Plus className="w-5 h-5" />
-            Neuer Termin
-          </DialogTitle>
-        </DialogHeader>
-        {selectedSlot && (
-          <div className="mb-4 p-3 bg-muted/50 rounded-lg">
-            <p className="text-sm text-muted-foreground">
-              <strong>{format(selectedDate, 'EEEE, d. MMMM', { locale: de })}</strong> um <strong>{selectedSlot.time} Uhr</strong> bei <strong>{selectedSlot.staffName}</strong>
-            </p>
-          </div>
-        )}
-        <ReservationForm
-          onSuccess={() => {
-            setIsBookingOpen(false);
-            setSelectedSlot(null);
-            refetch();
-          }}
-          defaultValues={
-            selectedSlot
-              ? {
-                  reservation_date: format(selectedDate, 'yyyy-MM-dd'),
-                  reservation_time: selectedSlot.time,
-                  staff_member_id: selectedSlot.staffId,
-                }
-              : undefined
-          }
-        />
-      </DialogContent>
-    </Dialog>
-    </>
   );
 };
