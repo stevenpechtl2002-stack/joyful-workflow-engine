@@ -6,8 +6,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
-import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable';
-import { ChevronLeft, ChevronRight, Plus, User, Phone, Mail, Clock, Calendar, Users, FileText, Pencil, Sparkles, Trash2, GripVertical } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, User, Phone, Mail, Clock, Calendar, Users, FileText, Pencil, Sparkles, Trash2 } from 'lucide-react';
 import { format, addDays, subDays, startOfWeek, endOfWeek, eachDayOfInterval, isSameDay, getDay } from 'date-fns';
 import { de } from 'date-fns/locale';
 import { useStaffMembers, useUpdateReservationStaff, StaffMember } from '@/hooks/useStaffMembers';
@@ -326,10 +325,10 @@ export const StaffCalendarView = () => {
     }
   };
 
-  // Render single day columns with resizable panels
+  // Render single day columns
   const renderDayView = () => (
     <div className="flex overflow-x-auto">
-      {/* Time column - fixed width */}
+      {/* Time column */}
       <div className="flex-shrink-0 w-16 border-r border-border-subtle">
         <div className="h-12 border-b border-border-subtle" /> {/* Header spacer */}
         <div className="relative" style={{ height: TIME_SLOTS.length * SLOT_HEIGHT }}>
@@ -345,127 +344,113 @@ export const StaffCalendarView = () => {
         </div>
       </div>
 
-      {/* Resizable panel group for columns */}
-      <ResizablePanelGroup direction="horizontal" className="flex-1 min-w-0">
-        {/* Unassigned column */}
-        <ResizablePanel defaultSize={15} minSize={8} maxSize={25}>
-          <div className="h-full border-r border-border-subtle bg-muted/30">
-            <div className="h-12 border-b border-border-subtle flex items-center justify-center">
-              <span className="text-xs font-medium text-muted-foreground">Nicht zugewiesen</span>
-            </div>
+      {/* Unassigned column */}
+      <div className="flex-shrink-0 w-32 border-r border-border-subtle bg-muted/30">
+        <div className="h-12 border-b border-border-subtle flex items-center justify-center">
+          <span className="text-xs font-medium text-muted-foreground">Nicht zugewiesen</span>
+        </div>
+        <div
+          className="relative"
+          style={{ height: TIME_SLOTS.length * SLOT_HEIGHT }}
+          onDragOver={handleDragOver}
+          onDrop={(e) => handleDrop(e, '', currentDate)}
+        >
+          {TIME_SLOTS.map((slot, idx) => (
             <div
-              className="relative"
-              style={{ height: TIME_SLOTS.length * SLOT_HEIGHT }}
-              onDragOver={handleDragOver}
-              onDrop={(e) => handleDrop(e, '', currentDate)}
+              key={slot.label}
+              className={`absolute w-full border-t ${slot.minutes === 0 ? 'border-border-subtle' : 'border-border-subtle/30'}`}
+              style={{ top: idx * SLOT_HEIGHT, height: SLOT_HEIGHT }}
+            />
+          ))}
+          {getUnassignedReservationsForDate(currentDate).map((res) => (
+            <motion.div
+              key={res.id}
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              draggable
+              onDragStart={(e) => handleDragStart(e as unknown as React.DragEvent, res.id)}
+              onClick={(e) => handleReservationClick(e as unknown as React.MouseEvent, res)}
+              className={`absolute left-1 right-1 rounded-md px-2 py-1 cursor-pointer shadow-sm border border-white/20 ${getStatusColor(res.status)} text-white hover:ring-2 hover:ring-white/50 transition-all`}
+              style={{
+                top: calculateBlockPosition(res.reservation_time),
+                height: calculateBlockHeight(res.reservation_time, res.end_time),
+                minHeight: 30
+              }}
             >
-              {TIME_SLOTS.map((slot, idx) => (
+              <div className="text-[10px] font-medium truncate">{res.reservation_time.slice(0, 5)}</div>
+              <div className="text-xs font-semibold truncate">{res.customer_name}</div>
+            </motion.div>
+          ))}
+        </div>
+      </div>
+
+      {/* Staff columns */}
+      {activeStaffMembers.map((staff: StaffMember) => (
+        <div key={staff.id} className="flex-shrink-0 w-40 border-r border-border-subtle/50">
+          {/* Staff header */}
+          <div className="h-12 border-b border-border-subtle flex items-center justify-center gap-2 px-2">
+            <Avatar className="h-7 w-7">
+              <AvatarFallback style={{ backgroundColor: staff.color, color: 'white', fontSize: '10px' }}>
+                {getInitials(staff.name)}
+              </AvatarFallback>
+            </Avatar>
+            <span className="text-sm font-medium truncate">{staff.name}</span>
+          </div>
+
+          {/* Time slots */}
+          <div
+            className="relative"
+            style={{ height: TIME_SLOTS.length * SLOT_HEIGHT }}
+            onDragOver={handleDragOver}
+            onDrop={(e) => handleDrop(e, staff.id, currentDate)}
+          >
+            {/* 30-min slot lines */}
+            {TIME_SLOTS.map((slot, idx) => {
+              const isWorking = isStaffWorkingAt(staff.id, currentDate, slot.hour, slot.minutes);
+              return (
                 <div
                   key={slot.label}
-                  className={`absolute w-full border-t ${slot.minutes === 0 ? 'border-border-subtle' : 'border-border-subtle/30'}`}
+                  className={`absolute w-full border-t ${slot.minutes === 0 ? 'border-border-subtle' : 'border-border-subtle/30'} ${
+                    isWorking 
+                      ? 'hover:bg-primary/5 cursor-pointer' 
+                      : 'bg-muted/60 cursor-not-allowed'
+                  } transition-colors`}
                   style={{ top: idx * SLOT_HEIGHT, height: SLOT_HEIGHT }}
+                  onClick={() => isWorking && handleSlotClick(currentDate, slot.hour, slot.minutes, staff.id)}
+                  title={!isWorking ? 'Nicht im Dienst' : undefined}
                 />
-              ))}
-              {getUnassignedReservationsForDate(currentDate).map((res) => (
-                <motion.div
-                  key={res.id}
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  draggable
-                  onDragStart={(e) => handleDragStart(e as unknown as React.DragEvent, res.id)}
-                  onClick={(e) => handleReservationClick(e as unknown as React.MouseEvent, res)}
-                  className={`absolute left-1 right-1 rounded-md px-2 py-1 cursor-pointer shadow-sm border border-white/20 ${getStatusColor(res.status)} text-white hover:ring-2 hover:ring-white/50 transition-all`}
-                  style={{
-                    top: calculateBlockPosition(res.reservation_time),
-                    height: calculateBlockHeight(res.reservation_time, res.end_time),
-                    minHeight: 30
-                  }}
-                >
-                  <div className="text-[10px] font-medium truncate">{res.reservation_time.slice(0, 5)}</div>
-                  <div className="text-xs font-semibold truncate">{res.customer_name}</div>
-                </motion.div>
-              ))}
-            </div>
+              );
+            })}
+
+            {/* Reservations */}
+            {getReservationsForStaffAndDate(staff.id, currentDate).map((res) => (
+              <motion.div
+                key={res.id}
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                draggable
+                onDragStart={(e) => handleDragStart(e as unknown as React.DragEvent, res.id)}
+                onClick={(e) => handleReservationClick(e as unknown as React.MouseEvent, res)}
+                className="absolute left-1 right-1 rounded-md px-2 py-1 cursor-pointer shadow-sm text-white overflow-hidden hover:ring-2 hover:ring-white/50 transition-all"
+                style={{
+                  top: calculateBlockPosition(res.reservation_time),
+                  height: calculateBlockHeight(res.reservation_time, res.end_time),
+                  backgroundColor: staff.color,
+                  minHeight: 30
+                }}
+              >
+                <div className="text-[10px] font-medium opacity-90">
+                  {res.reservation_time.slice(0, 5)} - {res.end_time?.slice(0, 5) || ''}
+                </div>
+                <div className="text-xs font-semibold truncate">{res.customer_name}</div>
+                {res.notes && (
+                  <div className="text-[10px] opacity-80 truncate">{res.notes}</div>
+                )}
+              </motion.div>
+            ))}
           </div>
-        </ResizablePanel>
-        
-        <ResizableHandle withHandle className="bg-border hover:bg-primary/20 transition-colors" />
-
-        {/* Staff columns */}
-        {activeStaffMembers.map((staff: StaffMember, index: number) => (
-          <>
-            <ResizablePanel key={staff.id} defaultSize={85 / Math.max(activeStaffMembers.length, 1)} minSize={10} maxSize={50}>
-              <div className="h-full border-r border-border-subtle/50">
-                {/* Staff header */}
-                <div className="h-12 border-b border-border-subtle flex items-center justify-center gap-2 px-2">
-                  <Avatar className="h-7 w-7">
-                    <AvatarFallback style={{ backgroundColor: staff.color, color: 'white', fontSize: '10px' }}>
-                      {getInitials(staff.name)}
-                    </AvatarFallback>
-                  </Avatar>
-                  <span className="text-sm font-medium truncate">{staff.name}</span>
-                </div>
-
-                {/* Time slots */}
-                <div
-                  className="relative"
-                  style={{ height: TIME_SLOTS.length * SLOT_HEIGHT }}
-                  onDragOver={handleDragOver}
-                  onDrop={(e) => handleDrop(e, staff.id, currentDate)}
-                >
-                  {/* 30-min slot lines */}
-                  {TIME_SLOTS.map((slot, idx) => {
-                    const isWorking = isStaffWorkingAt(staff.id, currentDate, slot.hour, slot.minutes);
-                    return (
-                      <div
-                        key={slot.label}
-                        className={`absolute w-full border-t ${slot.minutes === 0 ? 'border-border-subtle' : 'border-border-subtle/30'} ${
-                          isWorking 
-                            ? 'hover:bg-primary/5 cursor-pointer' 
-                            : 'bg-muted/60 cursor-not-allowed'
-                        } transition-colors`}
-                        style={{ top: idx * SLOT_HEIGHT, height: SLOT_HEIGHT }}
-                        onClick={() => isWorking && handleSlotClick(currentDate, slot.hour, slot.minutes, staff.id)}
-                        title={!isWorking ? 'Nicht im Dienst' : undefined}
-                      />
-                    );
-                  })}
-
-                  {/* Reservations */}
-                  {getReservationsForStaffAndDate(staff.id, currentDate).map((res) => (
-                    <motion.div
-                      key={res.id}
-                      initial={{ opacity: 0, scale: 0.95 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      draggable
-                      onDragStart={(e) => handleDragStart(e as unknown as React.DragEvent, res.id)}
-                      onClick={(e) => handleReservationClick(e as unknown as React.MouseEvent, res)}
-                      className="absolute left-1 right-1 rounded-md px-2 py-1 cursor-pointer shadow-sm text-white overflow-hidden hover:ring-2 hover:ring-white/50 transition-all"
-                      style={{
-                        top: calculateBlockPosition(res.reservation_time),
-                        height: calculateBlockHeight(res.reservation_time, res.end_time),
-                        backgroundColor: staff.color,
-                        minHeight: 30
-                      }}
-                    >
-                      <div className="text-[10px] font-medium opacity-90">
-                        {res.reservation_time.slice(0, 5)} - {res.end_time?.slice(0, 5) || ''}
-                      </div>
-                      <div className="text-xs font-semibold truncate">{res.customer_name}</div>
-                      {res.notes && (
-                        <div className="text-[10px] opacity-80 truncate">{res.notes}</div>
-                      )}
-                    </motion.div>
-                  ))}
-                </div>
-              </div>
-            </ResizablePanel>
-            {index < activeStaffMembers.length - 1 && (
-              <ResizableHandle withHandle className="bg-border hover:bg-primary/20 transition-colors" />
-            )}
-          </>
-        ))}
-      </ResizablePanelGroup>
+        </div>
+      ))}
 
       {activeStaffMembers.length === 0 && (
         <div className="flex-1 flex items-center justify-center min-h-[400px] text-muted-foreground">
