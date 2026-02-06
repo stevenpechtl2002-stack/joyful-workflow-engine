@@ -355,143 +355,129 @@ export const AvailabilityView = () => {
         ) : (
           <div className="overflow-x-auto">
             <div className="min-w-[600px]">
-              {/* Header with staff names */}
-              <div className="grid gap-2 mb-4" style={{ gridTemplateColumns: `80px repeat(${activeStaff.length}, 1fr)` }}>
-                <div className="text-sm font-medium text-muted-foreground flex items-center">
-                  <Clock className="w-4 h-4 mr-1" />
-                  Zeit
-                </div>
-                {activeStaff.map(staff => (
-                  <div key={staff.id} className="text-center">
-                    <div 
-                      className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium text-white"
-                      style={{ backgroundColor: staff.color }}
-                    >
-                      {staff.name}
-                    </div>
-                    <div className="text-xs text-muted-foreground mt-1">
-                      {freeSlotCounts[staff.id] || 0} frei
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Time slots grid - only show available */}
-              <div className="space-y-1">
-                {timeSlots.map(slotTime => {
-                  // Check if any staff has this slot available
-                  const anyAvailable = activeStaff.some(staff => 
-                    availabilityMatrix[staff.id]?.find(s => s.time === slotTime)?.available
-                  );
-
-                  if (!anyAvailable) return null;
-
+              {/* Staff rows - each staff gets a distinct row section */}
+              <div className="divide-y divide-border">
+                {activeStaff.map((staff, staffIndex) => {
+                  const staffSlots = availabilityMatrix[staff.id] || [];
+                  const shiftRange = staffShiftRanges[staff.id];
+                  const isNotWorking = !shiftRange;
+                  
                   return (
-                    <motion.div 
-                      key={slotTime}
-                      initial={{ opacity: 0, x: -10 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      className="grid gap-2 items-center"
-                      style={{ gridTemplateColumns: `80px repeat(${activeStaff.length}, 1fr)` }}
+                    <div 
+                      key={staff.id} 
+                      className={`py-4 ${staffIndex % 2 === 0 ? 'bg-muted/20' : 'bg-background'}`}
                     >
-                      <div className="text-sm font-medium text-muted-foreground">
-                        {slotTime}
+                      {/* Staff header row */}
+                      <div className="flex items-center gap-3 mb-3 px-2">
+                        <div 
+                          className="flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium text-white shadow-sm"
+                          style={{ backgroundColor: staff.color }}
+                        >
+                          {staff.name}
+                        </div>
+                        {isNotWorking ? (
+                          <span className="text-xs text-muted-foreground italic">Ruhetag</span>
+                        ) : (
+                          <>
+                            <span className="text-xs text-muted-foreground">
+                              {shiftRange.start} - {shiftRange.end}
+                            </span>
+                            <Badge variant="secondary" className="text-xs">
+                              {freeSlotCounts[staff.id] || 0} frei
+                            </Badge>
+                          </>
+                        )}
                       </div>
-                      {activeStaff.map(staff => {
-                        const slot = availabilityMatrix[staff.id]?.find(s => s.time === slotTime);
-                        const isAvailable = slot?.available || false;
-                        const slotKey = `${staff.id}-${slotTime}`;
-                        const isBooking = bookingSlot === slotKey;
-
-                        const conflictInfo = slot?.conflictingReservation;
-                        const isClosedDayBlocked = slot?.blockedByClosedDay;
-                        const isExceptionBlocked = slot?.blockedByException;
-                        const isOutsideShift = slot?.outsideShift;
-                        
-                        return (
-                          <div key={`${staff.id}-${slotTime}`} className="flex justify-center">
-                            {isBooking ? (
-                              <Badge 
-                                variant="outline" 
-                                className="bg-primary/10 text-primary border-primary/30"
-                              >
-                                <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                                ...
-                              </Badge>
-                            ) : isAvailable ? (
-                              <Badge 
-                                variant="outline" 
-                                className="bg-emerald-500/10 text-emerald-600 border-emerald-500/30 hover:bg-emerald-500/30 cursor-pointer transition-colors"
-                                onClick={() => handleSlotClick(staff.id, staff.name, slotTime)}
-                              >
-                                <Plus className="w-3 h-3 mr-1" />
-                                Frei
-                              </Badge>
-                            ) : isClosedDayBlocked ? (
-                              <Badge 
-                                variant="outline" 
-                                className="bg-muted text-muted-foreground border-border cursor-default"
-                              >
-                                <Building2 className="w-3 h-3 mr-1" />
-                                Ruhetag
-                              </Badge>
-                            ) : isOutsideShift ? (
-                              <span className="text-muted-foreground/30">—</span>
-                            ) : isExceptionBlocked ? (
-                              <Badge 
-                                variant="outline" 
-                                className="bg-amber-500/10 text-amber-600 border-amber-500/30 cursor-default"
-                              >
-                                <Ban className="w-3 h-3 mr-1" />
-                                Frei
-                              </Badge>
-                            ) : conflictInfo ? (
-                              <Badge 
-                                variant="outline" 
-                                className="bg-destructive/10 text-destructive border-destructive/30 cursor-default text-xs"
-                              >
-                                <XCircle className="w-3 h-3 mr-1" />
-                                {conflictInfo.reservation_time.slice(0, 5)}
-                                {conflictInfo.end_time ? `-${conflictInfo.end_time.slice(0, 5)}` : ''}
-                              </Badge>
-                            ) : (
-                              <span className="text-muted-foreground/40">—</span>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </motion.div>
+                      
+                      {/* Time slots for this staff */}
+                      {isNotWorking ? (
+                        <div className="px-2 text-sm text-muted-foreground italic">
+                          Nicht im Dienst
+                        </div>
+                      ) : (
+                        <div className="flex flex-wrap gap-1.5 px-2">
+                          {staffSlots.map(slot => {
+                            const slotTime = slot.time;
+                            const isAvailable = slot.available;
+                            const slotKey = `${staff.id}-${slotTime}`;
+                            const isBooking = bookingSlot === slotKey;
+                            const isOutsideShift = slot.outsideShift;
+                            const isExceptionBlocked = slot.blockedByException;
+                            const conflictInfo = slot.conflictingReservation;
+                            
+                            // Skip slots outside shift
+                            if (isOutsideShift) return null;
+                            
+                            return (
+                              <div key={slotKey} className="flex-shrink-0">
+                                {isBooking ? (
+                                  <Badge 
+                                    variant="outline" 
+                                    className="bg-primary/10 text-primary border-primary/30 min-w-[70px] justify-center"
+                                  >
+                                    <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                                  </Badge>
+                                ) : isAvailable ? (
+                                  <Badge 
+                                    variant="outline" 
+                                    className="bg-emerald-500/10 text-emerald-600 border-emerald-500/30 hover:bg-emerald-500/30 cursor-pointer transition-colors min-w-[70px] justify-center"
+                                    onClick={() => handleSlotClick(staff.id, staff.name, slotTime)}
+                                  >
+                                    {slotTime}
+                                  </Badge>
+                                ) : isExceptionBlocked ? (
+                                  <Badge 
+                                    variant="outline" 
+                                    className="bg-amber-500/10 text-amber-600 border-amber-500/30 cursor-default min-w-[70px] justify-center"
+                                  >
+                                    <Ban className="w-3 h-3 mr-1" />
+                                    {slotTime}
+                                  </Badge>
+                                ) : conflictInfo ? (
+                                  <Badge 
+                                    variant="outline" 
+                                    className="bg-red-500/10 text-red-600 border-red-500/30 cursor-default min-w-[70px] justify-center"
+                                  >
+                                    <XCircle className="w-3 h-3 mr-1" />
+                                    {slotTime}
+                                  </Badge>
+                                ) : null}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
                   );
                 })}
-              </div>
-
-              {/* Summary */}
-              <div className="mt-6 pt-4 border-t border-border/50">
-                <div className="flex flex-wrap gap-4 justify-center">
-                  {activeStaff.map(staff => {
-                    const freeCount = freeSlotCounts[staff.id] || 0;
-                    const totalSlots = workingSlotCounts[staff.id] || 0;
-                    const percentage = Math.round((freeCount / totalSlots) * 100);
-                    
-                    return (
-                      <div key={staff.id} className="flex items-center gap-2 text-sm">
-                        <div 
-                          className="w-3 h-3 rounded-full" 
-                          style={{ backgroundColor: staff.color }}
-                        />
-                        <span className="font-medium">{staff.name}:</span>
-                        <span className={freeCount > 0 ? 'text-green-600' : 'text-muted-foreground'}>
-                          {totalSlots > 0 ? `${freeCount}/${totalSlots} frei (${percentage}%)` : 'Nicht im Dienst'}
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
               </div>
             </div>
           </div>
         )}
       </CardContent>
+
+      {/* Footer summary */}
+      <div className="px-6 py-4 border-t border-border-subtle bg-muted/30 rounded-b-lg">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-4 text-sm">
+            <div className="flex items-center gap-1.5">
+              <div className="w-3 h-3 rounded-full bg-emerald-500" />
+              <span className="text-muted-foreground">Verfügbar (klicken zum Blockieren)</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="w-3 h-3 rounded-full bg-red-500" />
+              <span className="text-muted-foreground">Belegt</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="w-3 h-3 rounded-full bg-amber-500" />
+              <span className="text-muted-foreground">Freigestellt</span>
+            </div>
+          </div>
+          <div className="text-sm text-muted-foreground">
+            {format(selectedDate, 'EEEE, d. MMMM yyyy', { locale: de })}
+          </div>
+        </div>
+      </div>
     </Card>
   );
 };
